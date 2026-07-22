@@ -51,9 +51,11 @@ else:
 if st.session_state.user:
     st.sidebar.success(f"Logged in as {st.session_state.user}")
     st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"user": None}))
-# Create empty list if it doesn't exist yet
+# Create empty list if it doesn't exist
 if 'properties' not in st.session_state:
-    st.session_state.properties = []if 'tenants' not in st.session_state:
+    st.session_state.properties = []
+if 'tenants' not in st.session_state:
+    st.session_state.tenants = []
     st.session_state.tenants = []
     page = st.sidebar.selectbox("Navigation", ["📊 Dashboard", "🏠 Properties", "👥 Tenants"])
 
