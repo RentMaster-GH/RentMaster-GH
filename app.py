@@ -60,30 +60,13 @@ if st.session_state.user:
         st.metric("Total Properties", "0")
         st.metric("Total Tenants", "0")
     
-    elif page == "🏠 Properties":
-        st.title("🏠 Properties")
-import json
-import os
-
-# --- FILE TO SAVE DATA ---
-DATA_FILE = "properties.json"
-
-def load_properties():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    return []
-
-def save_properties(props):
-    with open(DATA_FILE, "w") as f:
-        json.dump(props, f)
-
-# --- PROPERTIES PAGE ---
-elif page == "🏠 Properties":
+ elif page == "🏠 Properties":
     st.title("🏠 Properties")
     st.write("Add and manage your rental properties")
     
-    properties = load_properties()
+    # Simple version without file save for now
+    if 'properties' not in st.session_state:
+        st.session_state.properties = []
 
     # Add new property form
     with st.form("add_property"):
@@ -94,15 +77,14 @@ elif page == "🏠 Properties":
         submitted = st.form_submit_button("Save Property")
         
         if submitted and name:
-            properties.append({"name": name, "location": location, "rent": rent, "tenants": []})
-            save_properties(properties)
+            st.session_state.properties.append({"name": name, "location": location, "rent": rent})
             st.success(f"Property '{name}' added!")
             st.rerun()
 
     # Show all properties
     st.subheader("Your Properties")
-    if properties:
-        for i, prop in enumerate(properties):
+    if st.session_state.properties:
+        for prop in st.session_state.properties:
             st.write(f"**{prop['name']}** - {prop['location']} - GHS {prop['rent']}/month")
     else:
         st.info("No properties yet. Add one above!")
