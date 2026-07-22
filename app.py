@@ -62,4 +62,47 @@ if st.session_state.user:
     
     elif page == "🏠 Properties":
         st.title("🏠 Properties")
-        st.write("Add your properties here")
+import json
+import os
+
+# --- FILE TO SAVE DATA ---
+DATA_FILE = "properties.json"
+
+def load_properties():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    return []
+
+def save_properties(props):
+    with open(DATA_FILE, "w") as f:
+        json.dump(props, f)
+
+# --- PROPERTIES PAGE ---
+elif page == "🏠 Properties":
+    st.title("🏠 Properties")
+    st.write("Add and manage your rental properties")
+    
+    properties = load_properties()
+
+    # Add new property form
+    with st.form("add_property"):
+        st.subheader("Add New Property")
+        name = st.text_input("Property Name", placeholder="e.g. East Legon 2 Bedroom")
+        location = st.text_input("Location", placeholder="e.g. Accra, Ghana")
+        rent = st.number_input("Monthly Rent (GHS)", min_value=0)
+        submitted = st.form_submit_button("Save Property")
+        
+        if submitted and name:
+            properties.append({"name": name, "location": location, "rent": rent, "tenants": []})
+            save_properties(properties)
+            st.success(f"Property '{name}' added!")
+            st.rerun()
+
+    # Show all properties
+    st.subheader("Your Properties")
+    if properties:
+        for i, prop in enumerate(properties):
+            st.write(f"**{prop['name']}** - {prop['location']} - GHS {prop['rent']}/month")
+    else:
+        st.info("No properties yet. Add one above!")
