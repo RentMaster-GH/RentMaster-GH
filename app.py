@@ -51,7 +51,9 @@ else:
 if st.session_state.user:
     st.sidebar.success(f"Logged in as {st.session_state.user}")
     st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"user": None}))
-
+# Create empty list if it doesn't exist yet
+if 'properties' not in st.session_state:
+    st.session_state.properties = []
     page = st.sidebar.selectbox("Navigate", ["📊 Dashboard", "🏠 Properties"])
 
     if page == "📊 Dashboard":
@@ -60,10 +62,30 @@ if st.session_state.user:
         st.metric("Total Properties", "0")
         st.metric("Total Tenants", "0")
     
- elif page == "🏠 Properties":
-    st.title("🏠 Properties")
-    st.write("Add and manage your rental properties")
-    
+    elif page == "🏠 Properties":
+        st.title("🏠 Properties")
+        st.write("Add and manage your rental properties")
+        
+    # Add new property form
+    with st.form("add_property"):
+        st.subheader("Add New Property")
+        name = st.text_input("Property Name", placeholder="e.g. East Legon 2 Bedroom")
+        location = st.text_input("Location", placeholder="e.g. Accra, Ghana")
+        rent = st.number_input("Monthly Rent (GHS)", min_value=0)
+        submitted = st.form_submit_button("Save Property")
+        
+        if submitted and name:
+            st.session_state.properties.append({"name": name, "location": location, "rent": rent})
+            st.success(f"Property '{name}' added!")
+            st.rerun()
+
+    # Show all properties
+    st.subheader("Your Properties")
+    if st.session_state.properties:
+        for prop in st.session_state.properties:
+            st.write(f"**{prop['name']}** - {prop['location']} - GHS {prop['rent']}/month")
+    else:
+        st.info("No properties yet. Add one above!")
     # Simple version without file save for now
     if 'properties' not in st.session_state:
         st.session_state.properties = []
