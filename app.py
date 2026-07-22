@@ -53,8 +53,9 @@ if st.session_state.user:
     st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"user": None}))
 # Create empty list if it doesn't exist yet
 if 'properties' not in st.session_state:
-    st.session_state.properties = []
-    page = st.sidebar.selectbox("Navigate", ["📊 Dashboard", "🏠 Properties"])
+    st.session_state.properties = []if 'tenants' not in st.session_state:
+    st.session_state.tenants = []
+    page = st.sidebar.selectbox("Navigation", ["📊 Dashboard", "🏠 Properties", "👥 Tenants"])
 
     if page == "📊 Dashboard":
         st.title("📊 Dashboard")
@@ -109,4 +110,47 @@ if 'properties' not in st.session_state:
         for prop in st.session_state.properties:
             st.write(f"**{prop['name']}** - {prop['location']} - GHS {prop['rent']}/month")
     else:
-        st.info("No properties yet. Add one above!")
+
+        elif page == "👥 Tenants":
+    st.title("👥 Tenants")
+    st.write("Manage tenants for your properties")
+    
+    # Add new tenant form
+    with st.form("add_tenant_form"):
+        st.subheader("Add New Tenant")
+        
+        # Dropdown to pick which property
+        property_names = [p['name'] for p in st.session_state.properties]
+        if property_names:
+            prop_choice = st.selectbox("Select Property", property_names)
+        else:
+            st.warning("Add a property first!")
+            prop_choice = ""
+            
+        tenant_name = st.text_input("Tenant Name", placeholder="e.g. Kofi Mensah")
+        phone = st.text_input("Phone Number", placeholder="e.g. 0241234567")
+        move_in = st.date_input("Move-in Date")
+        submitted_tenant = st.form_submit_button("Save Tenant")
+        
+        if submitted_tenant and tenant_name and prop_choice:
+            st.session_state.tenants.append({
+                "name": tenant_name, 
+                "phone": phone, 
+                "property": prop_choice,
+                "move_in": str(move_in)
+            })
+            st.success(f"Tenant '{tenant_name}' added to {prop_choice}!")
+            st.rerun()
+elif page == "👥 Tenants":  # Line 144 - GOOD
+    st.title("👥 Tenants")
+    st.write("Manage tenants for your properties")
+    
+    # ... your form code above ...
+
+    # Show all tenants
+    st.subheader("Your Tenants")
+    if st.session_state.tenants:
+        for tenant in st.session_state.tenants:
+            st.write(f"**{tenant['name']}** - {tenant['property']} - 📞 {tenant['phone']}") # <-- FIX LINE 147
+    else:
+        st.info("No tenants yet. Add one above!") # <-- DELETE LINE 156
