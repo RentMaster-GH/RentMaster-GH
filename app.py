@@ -47,3 +47,19 @@ else:
                 st.success("Account created! Check your email to confirm, then Login.")
             else:
                 st.error("Signup failed")
+# --- Show Dashboard after login ---
+if st.session_state.user:
+    st.sidebar.success(f"Logged in as {st.session_state.user}")
+    st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"user": None}))
+
+    page = st.sidebar.selectbox("Navigate", ["📊 Dashboard", "🏠 Properties"])
+
+    if page == "📊 Dashboard":
+        st.title("📊 Dashboard")
+        st.write("Welcome to RentMaster GH!")
+        st.metric("Total Properties", "0")
+        st.metric("Total Tenants", "0")
+    
+    elif page == "🏠 Properties":
+        st.title("🏠 Properties")
+        st.write("Add your properties here")
