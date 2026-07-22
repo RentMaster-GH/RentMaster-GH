@@ -91,7 +91,7 @@ if 'properties' not in st.session_state:
         st.session_state.properties = []
 
     # Add new property form
-    with st.form("add_property"):
+    with st.form("add_property_form"):
         st.subheader("Add New Property")
         name = st.text_input("Property Name", placeholder="e.g. East Legon 2 Bedroom")
         location = st.text_input("Location", placeholder="e.g. Accra, Ghana")
