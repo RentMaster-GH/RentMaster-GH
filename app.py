@@ -3,14 +3,6 @@ import requests
 import json
 import os
 
-<<<<<<< HEAD
-PAYSTACK_SECRET_KEY = st.secrets["PAYSTACK_SECRET_KEY"] 
-APP_URL = "https://rentmaster-gh.streamlit.app/" # We'll update this after deploy
-
-st.title("🏠 RentMaster GH")
-
-# Load payments
-=======
 APP_URL = "https://rentmaster-gh-3j3u3aqkevcgxkfja5razj.streamlit.app/"
 
 PAYSTACK_SECRET_KEY = st.secrets["PAYSTACK_SECRET_KEY"]
@@ -76,8 +68,12 @@ with st.form("payment_form"):
         st.rerun()
     else:
         st.error("Payment not found or failed")
+st.subheader("Recent Payments")
+if payments:
+    st.dataframe(payments)
+else:
+    st.info("No payments yet")
 
-# 3. MANUAL VERIFY - after payment
 st.subheader("Pay Rent")
 email = st.text_input("Tenant Email", "test@gmail.com")
 amount = st.number_input("Amount GHS", min_value=1.0, value=1.00)
@@ -94,12 +90,13 @@ if st.button("Pay Now"):
     
     if response['status']:
         payment_url = response['data']['authorization_url']
-        st.link_button("Click here to Pay with Paystack", payment_url, type="primary", target="_blank")
-        st.session_state['last_ref'] = response['data']['reference'] # save reference
+        ref = response['data']['reference']
+        st.session_state['last_ref'] = ref
+        st.link_button("Click here to Pay with Paystack", payment_url, type="primary")
     else:
-        st.error("Could not initialize payment: " + response['message'])
+        st.error("Could not initialize payment")
 
-# --- THIS IS THE NEW VERIFY SECTION ---
+# MANUAL VERIFY SECTION
 st.subheader("Verify Payment")
 reference_input = st.text_input("Paste Reference from Paystack URL here", value=st.session_state.get('last_ref', ''))
 
@@ -112,12 +109,9 @@ if st.button("Verify Payment"):
         if response['status'] and response['data']['status'] == 'success':
             amount_paid = response['data']['amount'] / 100
             email_paid = response['data']['customer']['email']
-            
-            new_payment = {"email": email_paid, "amount": amount_paid, "ref": reference_input}
-            payments.append(new_payment)
+            payments.append({"email": email_paid, "amount": amount_paid, "ref": reference_input})
             with open("payments.json", "w") as f:
                 json.dump(payments, f)
-            
             st.success(f"✅ Payment of GHS {amount_paid} received!")
             st.rerun()
         else:
@@ -135,7 +129,6 @@ st.subheader("Pay Rent")
 with st.form("payment_form"):
     email = st.text_input("Tenant Email")
     amount = st.number_input("Amount GHS", min_value=1.0, value=1.0)
->>>>>>> 1b0256b (fix: add target blank to paystack link)
     submitted = st.form_submit_button("Pay Now")
     
     if submitted:
@@ -143,16 +136,6 @@ with st.form("payment_form"):
         data = {
             "email": email,
             "amount": int(amount * 100),
-<<<<<<< HEAD
-            "callback_url": APP_URL
-        }
-        r = requests.post('https://api.paystack.co/transaction/initialize', headers=headers, data=data)
-        response = r.json()
-        
-        if response['status']:
-            payment_url = response['data']['authorization_url']
-            st.link_button("Click here to Pay with Paystack", payment_url, type="primary")
-=======
             "callback_url": "https://stunning-parakeet-vpp977gwx6pw55-8501.app.github.dev/"
         }
         r = requests.post('https://api.paystack.co/transaction/initialize', headers=headers, data=data)
@@ -163,4 +146,3 @@ if response['status']:
     st.link_button("Click here to Pay with Paystack", payment_url, type="primary", target="_blank")
 else:
     st.error("Could not initialize payment: " + response['message'])
->>>>>>> 1b0256b (fix: add target blank to paystack link)
