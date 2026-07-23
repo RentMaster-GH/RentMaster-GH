@@ -5,7 +5,11 @@ import os
 
 APP_URL = "https://rentmaster-gh-3j3u3aqkevcgxkfja5razj.streamlit.app/"
 
-PAYSTACK_SECRET_KEY = st.secrets["PAYSTACK_SECRET_KEY"]
+try:
+    PAYSTACK_SECRET_KEY = st.secrets["PAYSTACK_SECRET_KEY"]
+except:
+    st.error("PAYSTACK_SECRET_KEY not found in Secrets. Add it in Settings > Secrets")
+    st.stop()
 
 st.title("🏠 RentMaster GH")
 
@@ -75,14 +79,14 @@ else:
     st.info("No payments yet")
 
 st.subheader("Pay Rent")
-email = st.text_input("Tenant Email", "test@gmail.com")
-amount = st.number_input("Amount GHS", min_value=1.0, value=1.00)
+email = st.text_input("Tenant Email", "papastickle@gmail.com")
+amount = st.number_input("Amount GHS", min_value=1.0, value=1.00, step=1.0)
 
-if st.button("Pay Now"):
+if st.button("Pay Now", type="primary"):
     headers = {"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"}
     data = {
         "email": email, 
-        "amount": int(amount * 100),
+        "amount": int(amount * 100), # convert to pesewas
         "callback_url": "https://rentmaster-gh-3j3u3aqkevcgkfja5raz.streamlit.app"
     }
     r = requests.post('https://api.paystack.co/transaction/initialize', headers=headers, data=data)
@@ -92,9 +96,10 @@ if st.button("Pay Now"):
         payment_url = response['data']['authorization_url']
         ref = response['data']['reference']
         st.session_state['last_ref'] = ref
-        st.link_button("Click here to Pay with Paystack", payment_url, type="primary")
+        st.link_button("👉 Click here to Pay with Paystack", payment_url, type="primary")
+        st.info(f"Reference: {ref}")
     else:
-        st.error("Could not initialize payment")
+        st.error("Could not initialize payment: " + response.get('message',''))
 
 # MANUAL VERIFY SECTION
 st.subheader("Verify Payment")
