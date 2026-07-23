@@ -78,8 +78,30 @@ with st.form("payment_form"):
         st.error("Payment not found or failed")
 
 # 3. MANUAL VERIFY - after payment
-st.subheader("3. Complete Payment")
-reference_input = st.text_input("Paste Reference from Paystack URL here", key="ref_input")
+st.subheader("Pay Rent")
+email = st.text_input("Tenant Email", "test@gmail.com")
+amount = st.number_input("Amount GHS", min_value=1.0, value=1.00)
+
+if st.button("Pay Now"):
+    headers = {"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"}
+    data = {
+        "email": email, 
+        "amount": int(amount * 100),
+        "callback_url": "https://rentmaster-gh-3j3u3aqkevcgkfja5raz.streamlit.app"
+    }
+    r = requests.post('https://api.paystack.co/transaction/initialize', headers=headers, data=data)
+    response = r.json()
+    
+    if response['status']:
+        payment_url = response['data']['authorization_url']
+        st.link_button("Click here to Pay with Paystack", payment_url, type="primary", target="_blank")
+        st.session_state['last_ref'] = response['data']['reference'] # save reference
+    else:
+        st.error("Could not initialize payment: " + response['message'])
+
+# --- THIS IS THE NEW VERIFY SECTION ---
+st.subheader("Verify Payment")
+reference_input = st.text_input("Paste Reference from Paystack URL here", value=st.session_state.get('last_ref', ''))
 
 if st.button("Verify Payment"):
     if reference_input:
@@ -88,19 +110,18 @@ if st.button("Verify Payment"):
         response = r.json()
         
         if response['status'] and response['data']['status'] == 'success':
-            amount = response['data']['amount'] / 100
-            email = response['data']['customer']['email']
+            amount_paid = response['data']['amount'] / 100
+            email_paid = response['data']['customer']['email']
             
-            new_payment = {"email": email, "amount": amount, "ref": reference_input}
+            new_payment = {"email": email_paid, "amount": amount_paid, "ref": reference_input}
             payments.append(new_payment)
             with open("payments.json", "w") as f:
                 json.dump(payments, f)
             
-            st.success(f"✅ Payment of GHS {amount} received!")
+            st.success(f"✅ Payment of GHS {amount_paid} received!")
             st.rerun()
         else:
             st.error("Payment not successful yet")
-
 # 4. SHOW PAYMENTS
 st.subheader("Recent Payments")
 if payments:
