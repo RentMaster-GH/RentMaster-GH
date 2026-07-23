@@ -1,23 +1,17 @@
-import streamlit as st
+import os
+import json
 import requests
 import pandas as pd
-from datetime import datetime
+import streamlit as st
 
 APP_URL = "https://rentmaster-gh-3j3u3xk..."
 st.set_page_config(page_title="RentMaster GH")
 st.title("RentMaster GH")
 
-# DATA: Store in session so it survives reruns but not reboots
-if "payments" not in st.session_state:
-    st.session_state.payments = []
-if "last_ref" not in st.session_state:
-    st.session_state.last_ref = ""
+if "payments" not in st.session_state: st.session_state.payments = []
 
-# CHECK SECRET
-if "PAYSTACK_SECRET_KEY" not in st.secrets:
-    st.error("Add PAYSTACK_SECRET_KEY to Settings > Secrets and Reboot")
-    st.stop()
-KEY = st.secrets["PAYSTACK_SECRET_KEY"]
+try: KEY = st.secrets["PAYSTACK_SECRET_KEY"]
+except: st.error("🚨 Add PAYSTACK_SECRET_KEY in Settings > Secrets"); st.stop()
 
 st.title("RentMaster GH")
 
@@ -81,47 +75,31 @@ col1, col2 = st.columns(2)
 # LAYOUT
 tab1, tab2 = st.tabs(["Pay Rent", "Payment History"])
 
-with tab1:
-    st.subheader("1. Create Payment")
-    email = st.text_input("Tenant Email", "test@gmail.com")
-    amount = st.number_input("Amount GHS", 1.0, 10000.0, 1.0, 1.0)
-    
-    if st.button("Generate Paystack Link", type="primary"):
-        headers = {"Authorization": f"Bearer {KEY}"}
-        data = {"email": email, "amount": int(amount * 100)}
-        r = requests.post("https://api.paystack.co/transaction/initialize", headers=headers, json=data)
-        res = r.json()
-        
-        if res["status"]:
-            st.session_state.last_ref = res["data"]["reference"]
-            st.link_button("PAY GHS {:.2f} NOW".format(amount), res["data"]["authorization_url"], type="primary")
-            st.info(f"Reference: `{st.session_state.last_ref}`")
-        else:
-            st.error(res["message"])
+st.subheader("Pay Rent")
+email = st.text_input("Tenant Email", "test@gmail.com")
+amount = st.number_input("Amount GHS", 1.0, 10000.0, 1.0)
 
-    st.divider()
-    st.subheader("2. Verify Payment After Paying")
-    ref = st.text_input("Paste Reference from Paystack URL", st.session_state.last_ref)
-    
-    if st.button("Verify & Save Payment"):
-        headers = {"Authorization": f"Bearer {KEY}"}
-        r = requests.get(f"https://api.paystack.co/transaction/verify/{ref}", headers=headers)
-        res = r.json()
-        
-        if res["status"] and res["data"]["status"] == "success":
-            payment = {
-                "Email": res["data"]["customer"]["email"],
-                "Amount GHS": res["data"]["amount"] / 100,
-                "Reference": res["data"]["reference"],
-                "Date": datetime.now().strftime("%Y-%m-%d %H:%M")
-            }
-            if payment["Reference"] not in [p["Reference"] for p in st.session_state.payments]:
-                st.session_state.payments.append(payment)
-            st.success(f"✅ Verified! GHS {payment['Amount GHS']} received")
-            st.rerun()
-        else:
-            st.error("Payment not successful")
+if st.button("Generate Payment Link", type="primary"):
+    r = requests.post("https://api.paystack.co/transaction/initialize", 
+        headers={"Authorization": f"Bearer {KEY}"}, 
+        json={"email": email, "amount": int(amount*100)})
+    res = r.json()
+    if res["status"]:
+        st.link_button(f"PAY GHS {amount:.2f} NOW", res["data"]["authorization_url"], type="primary")
+        st.info(f"Reference: `{res['data']['reference']}`")
+        st.session_state.last_ref = res["data"]["reference"]
 
+st.subheader("Verify Payment")
+ref = st.text_input("Paste Reference from Paystack", st.session_state.get("last_ref",""))
+if st.button("Verify & Save"):
+    r = requests.get(f"https://api.paystack.co/transaction/verify/{ref}", headers={"Authorization": f"Bearer {KEY}"})
+    res = r.json()
+    if res["status"] and res["data"]["status"] == "success":
+        st.session_state.payments.append({"Email": res["data"]["customer"]["email"], "Amount GHS": res["data"]["amount"]/100, "Ref": ref})
+        st.success("✅ Payment Verified!"); st.rerun()
+    else: st.error("Payment not successful")
+
+<<<<<<< HEAD
 with tab2:
     st.subheader("Recent Payments")
     if st.session_state.payments:
@@ -222,3 +200,5 @@ if response['status']:
     st.link_button("Click here to Pay with Paystack", payment_url, type="primary", target="_blank")
 else:
     st.error("Could not initialize payment: " + response['message'])
+
+st.dataframe(pd.DataFrame(st.session_state.payments))
