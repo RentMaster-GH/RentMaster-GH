@@ -269,14 +269,17 @@ with st.form("pay_rent_form"):
     submitted = st.form_submit_button("Pay Now")
     
     if submitted:
-        headers = {"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"}
-        data = {
-            "email": email,
-            "amount": int(amount * 100),
-            "callback_url": "https://stunning-parakeet-vpp977gwx6pw55-8501.app.github.dev/"
-        }
-        r = requests.post('https://api.paystack.co/transaction/initialize', headers=headers, data=data)
-response = r.json()
+        headers = {
+        "Authorization": f"Bearer {st.secrets['PAYSTACK_SECRET_KEY']}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "email": email,
+        "amount": int(amount * 100), # to pesewas
+        "callback_url": "https://rentmaster-gh-3j3u3agkevcgxkfja5raq.streamlit.app"
+    }
+    r = requests.post("https://api.paystack.co/transaction/initialize", headers=headers, json=data)
+    response = r.json()
 
 if response['status']:
     payment_url = response['data']['authorization_url']
