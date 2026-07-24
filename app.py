@@ -190,18 +190,23 @@ with col2:
     email = st.text_input("Tenant Email", "papastickle@gmail.com")
     amount = st.number_input("Amount GHS", min_value=1.0, value=1.00, step=1.0)
 
-    if st.button("Pay Now", type="primary", use_container_width=True):
-        with st.spinner("Creating payment link..."):
-            headers = {"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}", "Content-Type": "application/json"}
-            data = {
-                "email": email, 
-                "amount": int(amount * 100), # to pesewas
-                "callback_url": APP_URL # This will still fail, so we have manual verify
-            }
-            try:
-                r = requests.post('https://api.paystack.co/transaction/initialize', headers=headers, json=data, timeout=10)
-                response = r.json()
-            except Exception as e:
+    if st.button("Pay Now", type="primary"):
+    with st.spinner("Creating payment link..."):
+        headers = {
+            "Authorization": f"Bearer {st.secrets['PAYSTACK_SECRET_KEY']}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "email": email,
+            "amount": int(amount * 100), # to pesewas
+            "callback_url": "https://rentmaster-gh-3j3u3agkevcgxkfja5raq.streamlit.app" # your live app URL
+        }
+        try:
+            r = requests.post("https://api.paystack.co/transaction/initialize", headers=headers, json=data)
+            response = r.json()
+            r = requests.post('https://api.paystack.co/transaction/initialize', headers=headers, json=data, timeout=10)
+            response = r.json()
+        except Exception as e:
                 st.error(f"API Error: {e}")
                 st.stop()
         
