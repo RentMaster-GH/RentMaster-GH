@@ -52,7 +52,7 @@ if os.path.exists("payments.json"):
 st.subheader("Verify Payment Manually")
 manual_ref = st.text_input("7rqa828r2v", value="")
 if st.button("Verify & Save Payment"):
-    headers = {"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"}
+    headers = {"Authorization": "Bearer pk_test_c1ec4b8973c42b57935ee6d21fcf1d5ff76a1843"}
     r = requests.get(f'https://api.paystack.co/transaction/verify/{manual_ref}', headers=headers)
     response = r.json()
     
