@@ -224,7 +224,7 @@ st.divider()
 st.subheader("Verify Payment Manually")
 st.write("After paying on Paystack, copy the `reference=` from the URL and paste here")
 
-reference_input = st.text_input("Paste Reference Here", value=st.session_state.last_ref)
+reference_input = st.text_input("Paste Reference Here", key="verify_ref_manual")
 
 if st.button("Verify Payment", type="secondary", use_container_width=True):
     if not reference_input:
