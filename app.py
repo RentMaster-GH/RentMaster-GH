@@ -263,7 +263,7 @@ else:
 
 # 5. PAY FORM
 st.subheader("Pay Rent")
-with st.form("payment_form"):
+with st.form("pay_rent_form"):
     email = st.text_input("Tenant Email")
     amount = st.number_input("Amount GHS", min_value=1.0, value=1.0)
     submitted = st.form_submit_button("Pay Now")
