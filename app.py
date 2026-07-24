@@ -269,7 +269,7 @@ with st.form("pay_rent_form"):
     submitted = st.form_submit_button("Pay Now")
     
     if submitted:
-    headers = {
+        headers = {
         "Authorization": f"Bearer {st.secrets['PAYSTACK_SECRET_KEY']}",
         "Content-Type": "application/json"
     }
