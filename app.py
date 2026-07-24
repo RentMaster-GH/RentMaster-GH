@@ -191,8 +191,8 @@ with col2:
     amount = st.number_input("Amount GHS", min_value=1.0, value=1.00, step=1.0)
 
     if st.button("Pay Now", type="primary"):
-    with st.spinner("Creating payment link..."):
-        headers = {
+        with st.spinner("Creating payment link..."):
+            headers = {
             "Authorization": f"Bearer {st.secrets['PAYSTACK_SECRET_KEY']}",
             "Content-Type": "application/json"
         }
