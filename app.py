@@ -3,6 +3,27 @@ import json
 import requests
 import pandas as pd
 import streamlit as st
+import requests
+
+def create_payment(email, amount):
+    url = "https://api.paystack.co/transaction/initialize"
+    headers = {
+        "Authorization": f"Bearer {st.secrets['PAYSTACK_SECRET_KEY']}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "email": email,
+        "amount": int(amount * 100), # Paystack uses kobo/pesewas
+        "currency": "GHS"
+    }
+    response = requests.post(url, headers=headers, json=data)
+    result = response.json()
+    
+    if result['status']:
+        payment_url = result['data']['authorization_url']
+        st.link_button("Click to Pay on Paystack", payment_url)
+    else:
+        st.error("Failed to create payment link")
 
 APP_URL = "https://rentmaster-gh-3j3u3xk..."
 st.set_page_config(page_title="RentMaster GH")
@@ -58,11 +79,15 @@ st.subheader("Pay Rent")
 with st.form("payment_form"):
     email = st.text_input("Tenant Email")
     amount = st.number_input("Amount GHS", min_value=1.0, value=500.0)
-    if st.form_submit_button("Pay Now"):
-        st.success(f"✅ Payment of GHS {new_payment['amount']} saved!")
-        st.rerun()
-    else:
-        st.error("Payment not found or failed")
+    submitted = st.form_submit_button("Pay Now")
+    
+if submitted:
+    # Call Paystack to create payment link
+    create_payment(email, amount)
+    st.success(f"Redirecting to Paystack to pay GHS {amount}")
+    st.rerun()
+else:
+    st.error("Please fill email and amount")
 st.subheader("Recent Payments")
 if payments:
     st.dataframe(payments)
