@@ -269,7 +269,7 @@ with st.form("pay_rent_form"):
     submitted = st.form_submit_button("Pay Now")
     
     if submitted:
-        headers = {
+    headers = {
         "Authorization": f"Bearer {st.secrets['PAYSTACK_SECRET_KEY']}",
         "Content-Type": "application/json"
     }
@@ -286,7 +286,6 @@ with st.form("pay_rent_form"):
         st.link_button("Click here to Pay with Paystack", payment_url, type="primary")
     else:
         st.error("Could not initialize payment: " + response['message'])
-
 if response['status']:
     payment_url = response['data']['authorization_url']
     st.link_button("Click here to Pay with Paystack", payment_url, type="primary", target="_blank")
