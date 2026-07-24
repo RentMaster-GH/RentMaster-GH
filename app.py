@@ -50,7 +50,7 @@ if os.path.exists("payments.json"):
 
 # 2. MANUAL VERIFY BOX
 st.subheader("Verify Payment Manually")
-manual_ref = st.text_input("7rqa828r2v", value="")
+manual_ref = st.text_input("Paste Reference Here", key="verify_ref")
 if st.button("Verify & Save Payment"):
     headers = {"Authorization": "Bearer sk_test_32276d254647ec901b058f5a96d6a8d64bfc67ae"}
     r = requests.get(f'https://api.paystack.co/transaction/verify/{manual_ref}', headers=headers)
