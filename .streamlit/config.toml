@@ -1,0 +1,14 @@
+[server]
+port = 8501
+address = "0.0.0.0"
+headless = true
+maxUploadSize = 200
+enableCORS = false
+enableXsrfProtection = false
+fileWatcherType = "auto"
+
+[browser]
+gatherUsageStats = false
+
+[logger]
+level = "info"
