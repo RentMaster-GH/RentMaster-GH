@@ -32,43 +32,47 @@ def auth_page():
     st.title("Welcome to RentMaster-GH")
     tab1, tab2 = st.tabs(["Login", "Sign Up"])
 
-    with tab1:
-    st.subheader("Login")
-    email = st.text_input("Email", key="login_email")
-    password = st.text_input("Password", type="password", key="login_pw")
-    
-    if st.button("Login with Email", use_container_width=True, key="login_btn"):
-        try:
-            res = sb.auth.sign_in_with_password({"email": email, "password": password})
-            st.session_state.user = res.user
-            st.success("Logged in!")
-            st.rerun()
-        except Exception as e:
-            st.error("Invalid email or password")
-    
-    st.divider()
-    st.write("Or")
-    redirect_url = "https://www.rentmastergh.com" 
-    res = sb.auth.sign_in_with_oauth({
-        "provider": "google",
-        "options": {"redirect_to": redirect_url}
-    })
-    if res.url:
-        st.markdown(
-            f"""
-            <a href="{res.url}" target="_self" style="
-                display: flex; align-items: center; justify-content: center; gap: 10px;
-                width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 4px;
-                background-color: white; color: #3c4043; font-weight: 500; text-decoration: none;
-            ">
-                <img src="https://www.gstatic.com/images/branding/product/1x/gsa_64dp.png" width="18" height="18">
-                Continue with Google
-            </a>
-            """,
-            unsafe_allow_html=True
-        )
+    def auth_page():
+    st.title("Welcome to RentMaster-GH")
+    tab1, tab2 = st.tabs(["Login", "Sign Up"])
 
-    with tab2:
+    with tab1: # <-- everything under this must be indented 4 spaces
+        st.subheader("Login")
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_pw")
+        
+        if st.button("Login with Email", use_container_width=True, key="login_btn"):
+            try:
+                res = sb.auth.sign_in_with_password({"email": email, "password": password})
+                st.session_state.user = res.user
+                st.success("Logged in!")
+                st.rerun()
+            except Exception as e:
+                st.error("Invalid email or password")
+        
+        st.divider()
+        st.write("Or")
+        redirect_url = "https://www.rentmastergh.com" 
+        res = sb.auth.sign_in_with_oauth({
+            "provider": "google",
+            "options": {"redirect_to": redirect_url}
+        })
+        if res.url:
+            st.markdown(
+                f"""
+                <a href="{res.url}" target="_self" style="
+                    display: flex; align-items: center; justify-content: center; gap: 10px;
+                    width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 4px;
+                    background-color: white; color: #3c4043; font-weight: 500; text-decoration: none;
+                ">
+                    <img src="https://www.gstatic.com/images/branding/product/1x/gsa_64dp.png" width="18" height="18">
+                    Continue with Google
+                </a>
+                """,
+                unsafe_allow_html=True
+            )
+
+    with tab2: # <-- everything under this must be indented 4 spaces
         st.subheader("Create Account")
         new_email = st.text_input("Email Address", key="signup_email")
         confirm_email = st.text_input("Confirm Email Address", key="confirm_email")
@@ -80,26 +84,14 @@ def auth_page():
                 st.error("Emails do not match")
             elif new_password != confirm_password:
                 st.error("Passwords do not match")
+            elif len(new_password) < 6:
+                st.error("Password must be at least 6 characters")
             else:
                 try:
                     res = sb.auth.sign_up({"email": new_email, "password": new_password})
                     st.success("Account created! Check your email to confirm.")
                 except Exception as e:
                     st.error(f"Error: {e}")
-
-# 2. ONLY SHOW LOGIN IF NO USER
-if st.session_state.user is None:
-    auth_page()
-    st.stop() 
-
-# Logout button in sidebar
-with st.sidebar:
-    st.write(f"👤 {st.session_state.user.email}")
-    if st.button("Logout"):
-        sb.auth.sign_out()
-        st.session_state.user = None
-        st.rerun()
-# ====== END AUTH CODE ======
 
 
 @st.cache_resource
