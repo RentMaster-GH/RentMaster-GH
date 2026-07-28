@@ -21,14 +21,15 @@ if "user" not in st.session_state:
     st.session_state.user = None
 
 def auth_page():
-    tab1, tab2 = st.tabs(["Login", "Sign Up"])
+    st.title("Welcome to RentMaster-GH")
+    tab1, tab2 = st.tabs(["Login", "Sign Up"]) # <-- THIS LINE WAS MISSING
 
     with tab1:
         st.subheader("Login")
         email = st.text_input("Email", key="login_email")
         password = st.text_input("Password", type="password", key="login_pw")
         
-        if st.button("Login with Email", use_container_width=True):
+        if st.button("Login with Email", use_container_width=True, key="login_btn"):
             try:
                 res = sb.auth.sign_in_with_password({"email": email, "password": password})
                 st.session_state.user = res.user
@@ -38,17 +39,13 @@ def auth_page():
                 st.error("Invalid email or password")
         
         st.divider()
-if st.button("Continue with Google", use_container_width=True):
-    redirect_url = "https://www.rentmastergh.com" # Change this to your Render URL
-    res = sb.auth.sign_in_with_oauth({
-        "provider": "google",
-        "options": {
-            "redirect_to": redirect_url
-        }
-    })
-    if res.url:
-        st.link_button("Click here to continue with Google", res.url, use_container_width=True)
-        st.info("If nothing happens, click the button above")
+        redirect_url = "https://www.rentmastergh.com" 
+        res = sb.auth.sign_in_with_oauth({
+            "provider": "google",
+            "options": {"redirect_to": redirect_url}
+        })
+        if res.url:
+            st.link_button("Continue with Google", res.url, use_container_width=True)
 
     with tab2:
         st.subheader("Create Account")
@@ -57,7 +54,7 @@ if st.button("Continue with Google", use_container_width=True):
         new_password = st.text_input("Password", type="password", key="signup_pw")
         confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pw")
 
-        if st.button("Sign Up", use_container_width=True):
+        if st.button("Sign Up", use_container_width=True, key="signup_btn"):
             if new_email != confirm_email:
                 st.error("Emails do not match")
             elif new_password != confirm_password:
@@ -68,14 +65,12 @@ if st.button("Continue with Google", use_container_width=True):
                 try:
                     res = sb.auth.sign_up({"email": new_email, "password": new_password})
                     st.success("Account created! Check your email to confirm.")
-                    st.info("Supabase will send a confirmation email.")
                 except Exception as e:
                     st.error(f"Error: {e}")
 
 if st.session_state.user is None:
-    st.title("Welcome to RentMaster-GH")
     auth_page()
-    st.stop() # Blocks the app until logged in
+    st.stop() 
 
 # Logout button in sidebar
 with st.sidebar:
