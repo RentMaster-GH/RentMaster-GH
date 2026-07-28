@@ -6,31 +6,57 @@ payments, leases, and maintenance requests with a dashboard overview.
 
 import os
 from datetime import datetime, date, timedelta
-
 import streamlit as st
 from dotenv import load_dotenv
 from supabase import create_client
 
 load_dotenv()
 
-SUPABASE_URL = os.environ.get("VITE_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("VITE_SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY")
+# ====== ADD LOGIN CODE HERE - LINE 14 ======
+sb_temp = create_client(os.environ.get("VITE_SUPABASE_URL"), os.environ.get("VITE_SUPABASE_ANON_KEY"))
 
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+def login_page():
+    st.title("RentMaster-GH Login")
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        try:
+            res = sb_temp.auth.sign_in_with_password({"email": email, "password": password})
+            st.session_state.user = res.user
+            st.rerun()
+        except:
+            st.error("Invalid email or password")
+
+if st.session_state.user is None:
+    login_page()
+    st.stop() # <-- This stops the app here until someone logs in
+# ====== END LOGIN CODE ======
+
+
+SUPABASE_URL = os.environ.get("VITE_SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("VITE_SUPABASE_ANON_KEY")
 
 @st.cache_resource
 def get_client():
     if not SUPABASE_URL or not SUPABASE_KEY:
-        st.error("Supabase credentials not found. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.")
+        st.error("Supabase credentials missing")
         st.stop()
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
+sb = get_client() # <-- Now use the real sb for the rest of the app
 
-sb = get_client()
+# Add logout to sidebar
+with st.sidebar:
+    st.write(f"Logged in: {st.session_state.user.email}")
+    if st.button("Logout"):
+        sb.auth.sign_out()
+        st.session_state.user = None
+        st.rerun()
 
-# ---------------------------------------------------------------------------
 # Page config & theme
-# ---------------------------------------------------------------------------
-
 st.set_page_config(
     page_title="RentMaster-GH",
     page_icon=":house:",
