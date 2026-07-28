@@ -125,8 +125,50 @@ def fetch_payments():
 
 @st.cache_data(ttl=5)
 def fetch_leases():
-    r = sb.table("leases").select("*, properties(*), tenants(*)").order("created_at", desc=True).execute()
-    return r.data or []
+    """
+    Robust lease fetch:
+    1) Try embedded relations + created_at order
+    2) Fallback to embedded relations + start_date order
+    3) Fallback to plain leases table
+    Never raises to UI; returns [] on total failure.
+    """
+    # Attempt 1: original query
+    try:
+        r = (
+            sb.table("leases")
+            .select("*, properties(*), tenants(*)")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return r.data or []
+    except Exception as e1:
+        st.warning(f"Leases query fallback #1 triggered: {e1}")
+
+    # Attempt 2: if created_at does not exist
+    try:
+        r = (
+            sb.table("leases")
+            .select("*, properties(*), tenants(*)")
+            .order("start_date", desc=True)
+            .execute()
+        )
+        return r.data or []
+    except Exception as e2:
+        st.warning(f"Leases query fallback #2 triggered: {e2}")
+
+    # Attempt 3: no relationship embedding (FK/embed issues)
+    try:
+        r = sb.table("leases").select("*").order("start_date", desc=True).execute()
+        data = r.data or []
+
+        # Normalize shape so UI code using l.get('properties') / l.get('tenants') won't break
+        for row in data:
+            row.setdefault("properties", None)
+            row.setdefault("tenants", None)
+        return data
+    except Exception as e3:
+        st.error(f"Failed to fetch leases after all fallbacks: {e3}")
+        return []
 
 
 @st.cache_data(ttl=5)
