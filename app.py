@@ -119,7 +119,7 @@ def fetch_tenants():
 
 @st.cache_data(ttl=5)
 def fetch_payments():
-    r = sb.table("payments").select("*, tenants(*)").order("payment_date", desc=True).execute()
+    r = sb.table("payments").select("*, tenants(*)").order("paid_at", desc=True).execute()
     return r.data or []
 
 
