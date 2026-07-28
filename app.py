@@ -33,8 +33,8 @@ def auth_page():
     tab1, tab2 = st.tabs(["Login", "Sign Up"])
 
     def auth_page():
-    st.title("Welcome to RentMaster-GH")
-    tab1, tab2 = st.tabs(["Login", "Sign Up"])
+        st.title("Welcome to RentMaster-GH")
+        tab1, tab2 = st.tabs(["Login", "Sign Up"])
 
     with tab1: # <-- everything under this must be indented 4 spaces
         st.subheader("Login")
