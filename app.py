@@ -38,8 +38,17 @@ def auth_page():
                 st.error("Invalid email or password")
         
         st.divider()
-        if st.button("Continue with Google", use_container_width=True):
-            sb.auth.sign_in_with_oauth({"provider": "google"})
+if st.button("Continue with Google", use_container_width=True):
+    redirect_url = "https://www.rentmastergh.com" # Change this to your Render URL
+    res = sb.auth.sign_in_with_oauth({
+        "provider": "google",
+        "options": {
+            "redirect_to": redirect_url
+        }
+    })
+    if res.url:
+        st.link_button("Click here to continue with Google", res.url, use_container_width=True)
+        st.info("If nothing happens, click the button above")
 
     with tab2:
         st.subheader("Create Account")
