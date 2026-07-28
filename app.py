@@ -678,7 +678,7 @@ def page_maintenance():
                     try:
                         sb.table("maintenance_requests").insert({
                             "property_id": pid,
-                            "tenant_id": tid,
+                            "tenant_id": tid if tid else None,
                             "title": title, "description": desc,
                             "priority": priority, "status": status,
                         }).execute()
