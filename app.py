@@ -12,39 +12,77 @@ from supabase import create_client
 
 load_dotenv()
 
-# ====== ADD LOGIN CODE HERE - LINE 14 ======
-sb_temp = create_client(os.environ.get("VITE_SUPABASE_URL"), os.environ.get("VITE_SUPABASE_ANON_KEY"))
+# ====== GOOGLE LOGIN + SIGNUP CODE ======
+SUPABASE_URL = os.environ.get("VITE_SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("VITE_SUPABASE_ANON_KEY")
+sb = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 if "user" not in st.session_state:
     st.session_state.user = None
 
-def login_page():
-    st.title("RentMaster-GH Login")
-    email = st.text_input("Email")
-    password = st.text_input("Password", type="password")
-    if st.button("Login"):
-        try:
-            res = sb_temp.auth.sign_in_with_password({"email": email, "password": password})
-            st.session_state.user = res.user
-            st.rerun()
-        except:
-            st.error("Invalid email or password")
+def auth_page():
+    tab1, tab2 = st.tabs(["Login", "Sign Up"])
+
+    with tab1:
+        st.subheader("Login")
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_pw")
+        
+        if st.button("Login with Email", use_container_width=True):
+            try:
+                res = sb.auth.sign_in_with_password({"email": email, "password": password})
+                st.session_state.user = res.user
+                st.success("Logged in!")
+                st.rerun()
+            except Exception as e:
+                st.error("Invalid email or password")
+        
+        st.divider()
+        if st.button("Continue with Google", use_container_width=True):
+            sb.auth.sign_in_with_oauth({"provider": "google"})
+
+    with tab2:
+        st.subheader("Create Account")
+        new_email = st.text_input("Email Address", key="signup_email")
+        confirm_email = st.text_input("Confirm Email Address", key="confirm_email")
+        new_password = st.text_input("Password", type="password", key="signup_pw")
+        confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pw")
+
+        if st.button("Sign Up", use_container_width=True):
+            if new_email != confirm_email:
+                st.error("Emails do not match")
+            elif new_password != confirm_password:
+                st.error("Passwords do not match")
+            elif len(new_password) < 6:
+                st.error("Password must be at least 6 characters")
+            else:
+                try:
+                    res = sb.auth.sign_up({"email": new_email, "password": new_password})
+                    st.success("Account created! Check your email to confirm.")
+                    st.info("Supabase will send a confirmation email.")
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
 if st.session_state.user is None:
-    login_page()
-    st.stop() # <-- This stops the app here until someone logs in
-# ====== END LOGIN CODE ======
+    st.title("Welcome to RentMaster-GH")
+    auth_page()
+    st.stop() # Blocks the app until logged in
 
+# Logout button in sidebar
+with st.sidebar:
+    st.write(f"👤 {st.session_state.user.email}")
+    if st.button("Logout"):
+        sb.auth.sign_out()
+        st.session_state.user = None
+        st.rerun()
+# ====== END AUTH CODE ======
 
-SUPABASE_URL = os.environ.get("VITE_SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("VITE_SUPABASE_ANON_KEY")
 
 @st.cache_resource
 def get_client():
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        st.error("Supabase credentials missing")
-        st.stop()
     return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# rest of your app.py continues here...
 
 sb = get_client() # <-- Now use the real sb for the rest of the app
 
