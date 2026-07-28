@@ -4,8 +4,9 @@ Full interactive UI backed by Supabase. Manages properties, tenants,
 payments, leases, and maintenance requests with a dashboard overview.
 """
 
+import json
 import os
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -107,20 +108,63 @@ def header():
 
 @st.cache_data(ttl=5)
 def fetch_properties():
-    r = sb.table("properties").select("*").order("created_at", desc=True).execute()
-    return r.data or []
+    try:
+        r = sb.table("properties").select("*").order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception as e1:
+        st.warning(f"Properties query fallback triggered: {e1}")
+    try:
+        r = sb.table("properties").select("*").order("id", desc=True).execute()
+        return r.data or []
+    except Exception as e2:
+        st.error(f"Failed to fetch properties: {e2}")
+        return []
 
 
 @st.cache_data(ttl=5)
 def fetch_tenants():
-    r = sb.table("tenants").select("*, properties(*)").order("created_at", desc=True).execute()
-    return r.data or []
+    try:
+        r = sb.table("tenants").select("*, properties(*)").order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception as e1:
+        st.warning(f"Tenants query fallback #1 triggered: {e1}")
+    try:
+        r = sb.table("tenants").select("*, properties(*)").order("lease_start", desc=True).execute()
+        return r.data or []
+    except Exception as e2:
+        st.warning(f"Tenants query fallback #2 triggered: {e2}")
+    try:
+        r = sb.table("tenants").select("*").order("id", desc=True).execute()
+        data = r.data or []
+        for row in data:
+            row.setdefault("properties", None)
+        return data
+    except Exception as e3:
+        st.error(f"Failed to fetch tenants after all fallbacks: {e3}")
+        return []
 
 
 @st.cache_data(ttl=5)
 def fetch_payments():
-    r = sb.table("payments").select("*, tenants(*)").order("paid_at", desc=True).execute()
-    return r.data or []
+    try:
+        r = sb.table("payments").select("*, tenants(*)").order("paid_at", desc=True).execute()
+        return r.data or []
+    except Exception as e1:
+        st.warning(f"Payments query fallback #1 triggered: {e1}")
+    try:
+        r = sb.table("payments").select("*, tenants(*)").order("payment_date", desc=True).execute()
+        return r.data or []
+    except Exception as e2:
+        st.warning(f"Payments query fallback #2 triggered: {e2}")
+    try:
+        r = sb.table("payments").select("*").order("id", desc=True).execute()
+        data = r.data or []
+        for row in data:
+            row.setdefault("tenants", None)
+        return data
+    except Exception as e3:
+        st.error(f"Failed to fetch payments after all fallbacks: {e3}")
+        return []
 
 
 @st.cache_data(ttl=5)
@@ -173,8 +217,36 @@ def fetch_leases():
 
 @st.cache_data(ttl=5)
 def fetch_maintenance():
-    r = sb.table("maintenance_requests").select("*, properties(*), tenants(*)").order("created_at", desc=True).execute()
-    return r.data or []
+    try:
+        r = (
+            sb.table("maintenance_requests")
+            .select("*, properties(*), tenants(*)")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return r.data or []
+    except Exception as e1:
+        st.warning(f"Maintenance query fallback #1 triggered: {e1}")
+    try:
+        r = (
+            sb.table("maintenance_requests")
+            .select("*, properties(*), tenants(*)")
+            .order("id", desc=True)
+            .execute()
+        )
+        return r.data or []
+    except Exception as e2:
+        st.warning(f"Maintenance query fallback #2 triggered: {e2}")
+    try:
+        r = sb.table("maintenance_requests").select("*").order("id", desc=True).execute()
+        data = r.data or []
+        for row in data:
+            row.setdefault("properties", None)
+            row.setdefault("tenants", None)
+        return data
+    except Exception as e3:
+        st.error(f"Failed to fetch maintenance requests after all fallbacks: {e3}")
+        return []
 
 
 def clear_cache():
@@ -302,15 +374,18 @@ def page_properties():
                 if not name or not address:
                     st.error("Property name and address are required.")
                 else:
-                    sb.table("properties").insert({
-                        "name": name, "address": address, "rent_amount": rent,
-                        "description": desc, "property_type": ptype,
-                        "bedrooms": int(beds), "bathrooms": int(baths),
-                        "is_occupied": occupied,
-                    }).execute()
-                    clear_cache()
-                    st.success(f"Property '{name}' added.")
-                    st.rerun()
+                    try:
+                        sb.table("properties").insert({
+                            "name": name, "address": address, "rent_amount": rent,
+                            "description": desc, "property_type": ptype,
+                            "bedrooms": int(beds), "bathrooms": int(baths),
+                            "is_occupied": occupied,
+                        }).execute()
+                        clear_cache()
+                        st.success(f"Property '{name}' added.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to add property: {e}")
 
     props = fetch_properties()
     if not props:
@@ -337,9 +412,12 @@ def page_properties():
                 st.caption(f"Type: {p.get('property_type', '-')}")
             with col4:
                 if st.button("Delete", key=f"del_prop_{p['id']}", type="secondary"):
-                    sb.table("properties").delete().eq("id", p["id"]).execute()
-                    clear_cache()
-                    st.rerun()
+                    try:
+                        sb.table("properties").delete().eq("id", p["id"]).execute()
+                        clear_cache()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to delete property: {e}")
 
 
 def page_tenants():
@@ -347,6 +425,9 @@ def page_tenants():
     st.subheader("Tenants")
 
     props = fetch_properties()
+    if not props:
+        st.warning("No properties found. Add a property before adding tenants.")
+        return
     prop_options = {p["id"]: prop_label(p) for p in props}
 
     with st.expander("Add New Tenant", expanded=False):
@@ -370,16 +451,19 @@ def page_tenants():
                 if not name:
                     st.error("Tenant name is required.")
                 else:
-                    sb.table("tenants").insert({
-                        "name": name, "email": email, "phone": phone,
-                        "property_id": prop_id if prop_id else None,
-                        "lease_start": str(lease_start),
-                        "lease_end": str(lease_end),
-                        "is_active": active,
-                    }).execute()
-                    clear_cache()
-                    st.success(f"Tenant '{name}' added.")
-                    st.rerun()
+                    try:
+                        sb.table("tenants").insert({
+                            "name": name, "email": email, "phone": phone,
+                            "property_id": prop_id if prop_id else None,
+                            "lease_start": str(lease_start),
+                            "lease_end": str(lease_end),
+                            "is_active": active,
+                        }).execute()
+                        clear_cache()
+                        st.success(f"Tenant '{name}' added.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to add tenant: {e}")
 
     tenants = fetch_tenants()
     if not tenants:
@@ -407,9 +491,12 @@ def page_tenants():
                 st.markdown(f"Status: **{status}**")
             with col4:
                 if st.button("Delete", key=f"del_tenant_{t['id']}", type="secondary"):
-                    sb.table("tenants").delete().eq("id", t["id"]).execute()
-                    clear_cache()
-                    st.rerun()
+                    try:
+                        sb.table("tenants").delete().eq("id", t["id"]).execute()
+                        clear_cache()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to delete tenant: {e}")
 
 
 def page_payments():
@@ -417,6 +504,9 @@ def page_payments():
     st.subheader("Payments")
 
     tenants = fetch_tenants()
+    if not tenants:
+        st.warning("No tenants found. Add a tenant before recording payments.")
+        return
     tenant_options = {t["id"]: tenant_label(t) for t in tenants}
 
     with st.expander("Record New Payment", expanded=False):
@@ -427,7 +517,7 @@ def page_payments():
                                    format_func=lambda x: tenant_options.get(x, "-"))
                 amount = st.number_input("Amount (GHs) *", min_value=0.0, value=0.0, step=10.0)
             with col2:
-                pdate = st.date_input("Payment Date", value=date.today())
+                pdate = st.date_input("Paid At", value=date.today())
                 status = st.selectbox("Status", ["paid", "pending", "overdue"])
             method = st.selectbox("Payment Method", ["cash", "card", "bank_transfer", "check", "other"])
             notes = st.text_area("Notes")
@@ -436,17 +526,20 @@ def page_payments():
                 if not tid or amount <= 0:
                     st.error("Select a tenant and enter a valid amount.")
                 else:
-                    sb.table("payments").insert({
-                        "tenant_id": tid,
-                        "amount": amount,
-                        "payment_date": str(pdate),
-                        "status": status,
-                        "payment_method": method,
-                        "notes": notes,
-                    }).execute()
-                    clear_cache()
-                    st.success("Payment recorded.")
-                    st.rerun()
+                    try:
+                        sb.table("payments").insert({
+                            "tenant_id": tid,
+                            "amount": amount,
+                            "paid_at": str(pdate),
+                            "status": status,
+                            "payment_method": method,
+                            "notes": notes,
+                        }).execute()
+                        clear_cache()
+                        st.success("Payment recorded.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to record payment: {e}")
 
     payments = fetch_payments()
     if not payments:
@@ -465,15 +558,18 @@ def page_payments():
             with col2:
                 st.markdown(f"Amount: {fmt_money(p.get('amount'))}")
             with col3:
-                st.markdown(f"Date: {fmt_date(p.get('payment_date'))}")
+                st.markdown(f"Date: {fmt_date(p.get('paid_at') or p.get('payment_date'))}")
             with col4:
                 st.markdown(f"Status: **{p.get('status', '-')}**")
                 st.caption(f"Method: {p.get('payment_method', '-')}")
             with col5:
                 if st.button("Delete", key=f"del_pay_{p['id']}", type="secondary"):
-                    sb.table("payments").delete().eq("id", p["id"]).execute()
-                    clear_cache()
-                    st.rerun()
+                    try:
+                        sb.table("payments").delete().eq("id", p["id"]).execute()
+                        clear_cache()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to delete payment: {e}")
 
 
 def page_leases():
@@ -482,6 +578,9 @@ def page_leases():
 
     props = fetch_properties()
     tenants = fetch_tenants()
+    if not props or not tenants:
+        st.warning("Both properties and tenants are required before creating leases.")
+        return
     prop_options = {p["id"]: prop_label(p) for p in props}
     tenant_options = {t["id"]: tenant_label(t) for t in tenants}
 
@@ -503,14 +602,17 @@ def page_leases():
                 if not pid or not tid:
                     st.error("Property and tenant are required.")
                 else:
-                    sb.table("leases").insert({
-                        "property_id": pid, "tenant_id": tid,
-                        "start_date": str(start), "end_date": str(end),
-                        "deposit_amount": deposit, "status": status,
-                    }).execute()
-                    clear_cache()
-                    st.success("Lease created.")
-                    st.rerun()
+                    try:
+                        sb.table("leases").insert({
+                            "property_id": pid, "tenant_id": tid,
+                            "start_date": str(start), "end_date": str(end),
+                            "deposit_amount": deposit, "status": status,
+                        }).execute()
+                        clear_cache()
+                        st.success("Lease created.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to create lease: {e}")
 
     leases = fetch_leases()
     if not leases:
@@ -535,9 +637,12 @@ def page_leases():
                 st.markdown(f"Status: **{l.get('status', '-')}**")
             with col5:
                 if st.button("Delete", key=f"del_lease_{l['id']}", type="secondary"):
-                    sb.table("leases").delete().eq("id", l["id"]).execute()
-                    clear_cache()
-                    st.rerun()
+                    try:
+                        sb.table("leases").delete().eq("id", l["id"]).execute()
+                        clear_cache()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to delete lease: {e}")
 
 
 def page_maintenance():
@@ -545,6 +650,9 @@ def page_maintenance():
     st.subheader("Maintenance Requests")
 
     props = fetch_properties()
+    if not props:
+        st.warning("No properties found. Add a property before filing maintenance requests.")
+        return
     tenants = fetch_tenants()
     prop_options = {p["id"]: prop_label(p) for p in props}
     tenant_options = {t["id"]: tenant_label(t) for t in tenants}
@@ -557,8 +665,8 @@ def page_maintenance():
                                    format_func=lambda x: prop_options.get(x, "-"))
                 title = st.text_input("Title *")
             with col2:
-                tid = st.selectbox("Tenant (optional)", [""] + list(tenant_options.keys()),
-                                   format_func=lambda x: tenant_options.get(x, "None"))
+                tid = st.selectbox("Tenant (optional)", [None] + list(tenant_options.keys()),
+                                   format_func=lambda x: "None" if x is None else tenant_options.get(x, "None"))
                 priority = st.selectbox("Priority", ["low", "medium", "high", "urgent"])
             desc = st.text_area("Description")
             status = st.selectbox("Status", ["open", "in_progress", "resolved", "closed"])
@@ -567,15 +675,18 @@ def page_maintenance():
                 if not pid or not title:
                     st.error("Property and title are required.")
                 else:
-                    sb.table("maintenance_requests").insert({
-                        "property_id": pid,
-                        "tenant_id": tid if tid else None,
-                        "title": title, "description": desc,
-                        "priority": priority, "status": status,
-                    }).execute()
-                    clear_cache()
-                    st.success("Maintenance request filed.")
-                    st.rerun()
+                    try:
+                        sb.table("maintenance_requests").insert({
+                            "property_id": pid,
+                            "tenant_id": tid,
+                            "title": title, "description": desc,
+                            "priority": priority, "status": status,
+                        }).execute()
+                        clear_cache()
+                        st.success("Maintenance request filed.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to file maintenance request: {e}")
 
     requests = fetch_maintenance()
     if not requests:
@@ -601,9 +712,12 @@ def page_maintenance():
                 st.caption(f"Filed: {fmt_date(m.get('created_at'))}")
             with col5:
                 if st.button("Delete", key=f"del_maint_{m['id']}", type="secondary"):
-                    sb.table("maintenance_requests").delete().eq("id", m["id"]).execute()
-                    clear_cache()
-                    st.rerun()
+                    try:
+                        sb.table("maintenance_requests").delete().eq("id", m["id"]).execute()
+                        clear_cache()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to delete maintenance request: {e}")
 
 
 def page_settings():
@@ -641,10 +755,10 @@ def page_settings():
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Export Properties (JSON)"):
-            st.download_button("Download", str(fetch_properties()), "properties.json", "application/json")
+            st.download_button("Download", json.dumps(fetch_properties(), default=str, indent=2), "properties.json", "application/json")
     with col2:
         if st.button("Export Payments (JSON)"):
-            st.download_button("Download", str(fetch_payments()), "payments.json", "application/json")
+            st.download_button("Download", json.dumps(fetch_payments(), default=str, indent=2), "payments.json", "application/json")
 
 
 # ---------------------------------------------------------------------------
