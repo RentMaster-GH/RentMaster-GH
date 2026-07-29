@@ -556,10 +556,7 @@ def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float,
         "reference": reference,
     }
 
-    if user_id:
-        ad_payload["user_id"] = user_id
-
-    # 1. Insert into Supabase 'ads' table
+    # 1. Insert into Supabase 'ads' table (Strict schema match)
     sb.table("ads").insert(ad_payload).execute()
 
     # 2. Call Paystack API
