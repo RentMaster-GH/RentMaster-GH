@@ -9,12 +9,11 @@ import json
 import os
 import uuid
 from datetime import date, timedelta
-
 import requests
 import streamlit as st
 from dotenv import load_dotenv
-from streamlit.errors import StreamlitSecretNotFoundError
 from supabase import create_client
+from streamlit.errors import StreamlitSecretNotFoundError
 
 # ---------------------------------------------------------------------------
 # Streamlit Config (MUST BE FIRST STREAMLIT COMMAND)
@@ -35,15 +34,17 @@ def get_secret(key: str, default: str = "") -> str:
     Safely retrieves a secret from OS environment variables first (e.g. Render, Heroku),
     and falls back to Streamlit secrets without crashing if secrets.toml is missing.
     """
+    # 1. Primary check: OS Environment Variables
     env_val = os.environ.get(key)
     if env_val:
         return env_val
 
+    # 2. Secondary check: Streamlit Secrets (for local dev or Streamlit Cloud)
     try:
         if key in st.secrets:
             return st.secrets[key]
     except StreamlitSecretNotFoundError:
-        pass
+        pass  # File does not exist on host; handle gracefully
 
     return default
 
@@ -66,6 +67,7 @@ sb = get_client()
 # ---------------------------------------------------------------------------
 # Paystack API Helpers & Ghana Payout Bank Codes
 # ---------------------------------------------------------------------------
+# Standard Paystack Ghana Bank & Mobile Money Codes
 GHANA_PAYOUT_BANKS = {
     "MTN Mobile Money": "MTN",
     "Vodafone Cash / Telecel Cash": "VOD",
@@ -80,7 +82,14 @@ GHANA_PAYOUT_BANKS = {
 }
 
 
-def create_paystack_subaccount(business_name, bank_code, account_number, percentage_charge=0.0, email=None, phone=None):
+def create_paystack_subaccount(business_name: str, bank_code: str, account_number: str, percentage_charge: float = 0.0, email: str = None, phone: str = None):
+    """
+    Registers a landlord as a subaccount on Paystack.
+    Returns response containing 'subaccount_code' (e.g. ACCT_xxxxxxx) on success.
+
+    :param percentage_charge: The platform fee % retained by your main account (e.g., 5.0 for 5%).
+                              Set to 0.0 if rent is passed 100% to the landlord.
+    """
     if not PAYSTACK_SECRET_KEY:
         return {"status": False, "message": "PAYSTACK_SECRET_KEY is missing."}
 
@@ -89,14 +98,16 @@ def create_paystack_subaccount(business_name, bank_code, account_number, percent
         "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
         "Content-Type": "application/json",
     }
+
     payload = {
         "business_name": business_name,
-        "settlement_bank": bank_code,
+        "settlement_bank": bank_code,  # e.g., 'MTN', 'VOD', '040100' (GCB)
         "account_number": account_number,
         "percentage_charge": percentage_charge,
         "primary_contact_email": email or "",
         "primary_contact_phone": phone or "",
     }
+
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=12)
         return response.json()
@@ -104,7 +115,11 @@ def create_paystack_subaccount(business_name, bank_code, account_number, percent
         return {"status": False, "message": str(e)}
 
 
-def initialize_paystack_payment(email, amount_in_ghs, callback_url, metadata=None):
+def initialize_paystack_payment(email: str, amount_in_ghs: float, callback_url: str, metadata: dict = None):
+    """
+    Initializes a transaction with Paystack API.
+    Amount is converted to subunit (Pesewas/Kobo) by multiplying by 100.
+    """
     if not PAYSTACK_SECRET_KEY:
         return {"status": False, "message": "PAYSTACK_SECRET_KEY is not configured in secrets or environment."}
 
@@ -119,8 +134,9 @@ def initialize_paystack_payment(email, amount_in_ghs, callback_url, metadata=Non
         "currency": "GHS",
         "callback_url": callback_url,
         "channels": ["card", "mobile_money", "bank_transfer"],
-        "metadata": metadata or {},
+        "metadata": metadata or {}
     }
+
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=10)
         return response.json()
@@ -128,12 +144,17 @@ def initialize_paystack_payment(email, amount_in_ghs, callback_url, metadata=Non
         return {"status": False, "message": str(e)}
 
 
-def verify_paystack_payment(reference):
+def verify_paystack_payment(reference: str):
+    """
+    Verifies transaction status directly with Paystack API.
+    """
     if not PAYSTACK_SECRET_KEY:
         return {"status": False, "message": "PAYSTACK_SECRET_KEY is missing."}
 
     url = f"https://api.paystack.co/transaction/verify/{reference}"
-    headers = {"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"}
+    headers = {
+        "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
+    }
     try:
         response = requests.get(url, headers=headers, timeout=10)
         return response.json()
@@ -141,14 +162,19 @@ def verify_paystack_payment(reference):
         return {"status": False, "message": str(e)}
 
 
-def save_landlord_bank_details(landlord_id, name, email, phone, bank_name, account_number, bank_code, platform_fee_pct=0.0):
+def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: str, bank_name: str, account_number: str, bank_code: str, platform_fee_pct: float = 0.0):
+    """
+    1. Calls Paystack API to create subaccount.
+    2. Saves landlord info and subaccount_code to Supabase.
+    """
+    # 1. Trigger automatic subaccount creation on Paystack
     ps_res = create_paystack_subaccount(
         business_name=name,
         bank_code=bank_code,
         account_number=account_number,
         percentage_charge=platform_fee_pct,
         email=email,
-        phone=phone,
+        phone=phone
     )
 
     if not ps_res.get("status"):
@@ -156,6 +182,7 @@ def save_landlord_bank_details(landlord_id, name, email, phone, bank_name, accou
 
     subaccount_code = ps_res["data"]["subaccount_code"]
 
+    # 2. Save payload including subaccount_code to Supabase
     payload = {
         "name": name,
         "email": email if email else None,
@@ -175,10 +202,11 @@ def save_landlord_bank_details(landlord_id, name, email, phone, bank_name, accou
 
 
 # ---------------------------------------------------------------------------
-# Custom CSS
+# Custom CSS for App Styling & Standard Centered Login Card
 # ---------------------------------------------------------------------------
 st.markdown("""
 <style>
+    /* Header Gradient Banner */
     .main-header {
         background: linear-gradient(135deg, #0f4c75 0%, #3282b8 100%);
         padding: 1.5rem 2rem;
@@ -203,52 +231,50 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------------------------
-# Auth Page
-# ---------------------------------------------------------------------------
 def auth_page():
     st.markdown("<br>", unsafe_allow_html=True)
     _, center_col, _ = st.columns([1, 1.8, 1])
 
     with center_col:
         with st.container(border=True):
+            # Direct Public Donation Link Callout
             st.markdown(
                 """
                 <div style="
-                    background-color: #f0fdf4;
-                    border: 1px solid #bbf7d0;
-                    border-radius: 8px;
-                    padding: 0.9rem;
-                    margin-bottom: 1rem;
+                    background-color: #f0fdf4; 
+                    border: 1px solid #bbf7d0; 
+                    border-radius: 8px; 
+                    padding: 0.9rem; 
+                    margin-bottom: 1rem; 
                     text-align: center;
                 ">
                     <p style="margin: 0 0 0.4rem 0; font-weight: 600; color: #166534; font-size: 0.88rem;">
                         Looking to make a payment or support without logging in?
                     </p>
-                    <a href="https://paystack.shop/pay/zvx0npq7hv"
-                       target="_blank"
-                       rel="noopener noreferrer"
+                    <a href="https://paystack.shop/pay/zvx0npq7hv" 
+                       target="_blank" 
+                       rel="noopener noreferrer" 
                        style="
-                           display: inline-block;
-                           background-color: #09a5db;
-                           color: #ffffff;
-                           font-weight: 600;
-                           padding: 8px 16px;
-                           border-radius: 6px;
+                           display: inline-block; 
+                           background-color: #09a5db; 
+                           color: #ffffff; 
+                           font-weight: 600; 
+                           padding: 8px 16px; 
+                           border-radius: 6px; 
                            text-decoration: none;
                            font-size: 0.88rem;
                            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
                        ">
-                        Make a Payment / Donation via Paystack
+                        💙 Make a Payment / Donation via Paystack
                     </a>
                 </div>
                 """,
-                unsafe_allow_html=True,
+                unsafe_allow_html=True
             )
 
             st.markdown("<h2 style='text-align: center; margin-bottom: 1rem;'>RentMaster-GH</h2>", unsafe_allow_html=True)
 
-            tab1, tab2 = st.tabs(["Log In", "Sign Up"])
+            tab1, tab2 = st.tabs(["🔒 Log In", "📝 Sign Up"])
             redirect_url = "https://www.rentmastergh.com"
 
             with tab1:
@@ -269,7 +295,7 @@ def auth_page():
                 try:
                     res = sb.auth.sign_in_with_oauth({
                         "provider": "google",
-                        "options": {"redirect_to": redirect_url},
+                        "options": {"redirect_to": redirect_url}
                     })
                     if res.url:
                         st.markdown(
@@ -284,7 +310,7 @@ def auth_page():
                                 Continue with Google
                             </a>
                             """,
-                            unsafe_allow_html=True,
+                            unsafe_allow_html=True
                         )
                 except Exception as e:
                     st.error(f"Google OAuth configuration error: {e}")
@@ -308,7 +334,6 @@ def auth_page():
                             st.success("Account created! Check your email to confirm.")
                         except Exception as e:
                             st.error(f"Error: {e}")
-
 
 # ---------------------------------------------------------------------------
 # Auth & Session Management
@@ -380,7 +405,7 @@ def show_support_dialog():
                         "user_email": user_email,
                         "created_at": str(date.today()),
                     }).execute()
-                    st.success("Your request has been submitted. Thank you!")
+                    st.success("✅ Your request has been submitted. Thank you!")
                 except Exception as e:
                     st.error(f"Failed to submit request: {e}")
 
@@ -498,7 +523,7 @@ def fmt_date(v):
 def prop_label(p):
     if not p:
         return "-"
-    p_name = p.get("name") or p.get("property_name", "Unnamed")
+    p_name = p.get('name') or p.get('property_name', 'Unnamed')
     return f"{p_name} - {p.get('address', '')}"
 
 
@@ -508,7 +533,15 @@ def tenant_label(t):
     return t.get("name", "Unnamed")
 
 
-def initialize_ad_payment(client_name, ad_position, amount_ghs, start_date, end_date, destination_url, creative_url, email, callback_url):
+# ---------------------------------------------------------------------------
+# Ad Management Helpers
+# ---------------------------------------------------------------------------
+def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float, start_date: str, end_date: str, destination_url: str, creative_url: str, email: str, callback_url: str):
+    """
+    1. Generates a unique transaction reference.
+    2. Saves the ad record to Supabase with status = 'pending_payment'.
+    3. Initializes Paystack payment and returns the payment authorization URL.
+    """
     reference = f"AD-{uuid.uuid4().hex[:10].upper()}"
 
     ad_payload = {
@@ -520,11 +553,13 @@ def initialize_ad_payment(client_name, ad_position, amount_ghs, start_date, end_
         "destination_url": destination_url,
         "creative_url": creative_url,
         "status": "pending_payment",
-        "reference": reference,
+        "reference": reference
     }
 
+    # 1. Insert into Supabase 'ads' table
     sb.table("ads").insert(ad_payload).execute()
 
+    # 2. Call Paystack API
     paystack_res = initialize_paystack_payment(
         email=email,
         amount_in_ghs=amount_ghs,
@@ -533,8 +568,8 @@ def initialize_ad_payment(client_name, ad_position, amount_ghs, start_date, end_
             "type": "advert_placement",
             "business_name": client_name,
             "ad_slot": ad_position,
-            "reference": reference,
-        },
+            "reference": reference
+        }
     )
 
     return paystack_res, reference
@@ -655,21 +690,21 @@ def page_properties():
         with st.container(border=True):
             col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
             with col1:
-                prop_title = p.get("name") or p.get("property_name", "Unnamed")
+                prop_title = p.get('name') or p.get('property_name', 'Unnamed')
                 st.markdown(f"**{prop_title}**")
                 st.caption(p.get("address", ""))
                 if p.get("description"):
                     st.caption(p.get("description"))
             with col2:
-                rent_val = p.get("monthly_rent") if p.get("monthly_rent") is not None else p.get("rent_amount")
+                rent_val = p.get('monthly_rent') if p.get('monthly_rent') is not None else p.get('rent_amount')
                 st.markdown(f"Rent: {fmt_money(rent_val)}")
-                beds_str = f"{p.get('bedrooms')} bed / " if p.get("bedrooms") is not None else ""
-                baths_str = f"{p.get('bathrooms')} bath" if p.get("bathrooms") is not None else ""
+                beds_str = f"{p.get('bedrooms')} bed / " if p.get('bedrooms') is not None else ""
+                baths_str = f"{p.get('bathrooms')} bath" if p.get('bathrooms') is not None else ""
                 st.caption(f"{beds_str}{baths_str}".strip())
             with col3:
                 badge = "Occupied" if p.get("is_occupied", False) else "Vacant"
                 st.markdown(f"Status: **{badge}**")
-                if p.get("property_type"):
+                if p.get('property_type'):
                     st.caption(f"Type: {p.get('property_type')}")
             with col4:
                 if st.button("Delete", key=f"del_prop_{p['id']}", type="secondary"):
@@ -684,14 +719,14 @@ def page_landlords():
     st.caption("Configure payout destinations (Mobile Money or Bank Account) for automated Paystack rent splits.")
 
     landlords = fetch_landlords()
-    landlord_options = {"new": "Add New Landlord"}
+    landlord_options = {"new": "➕ Add New Landlord"}
     for l in landlords:
         landlord_options[l["id"]] = f"{l['name']} ({l.get('phone', 'No Phone')})"
 
     selected_id = st.selectbox(
         "Select Landlord to Manage",
         options=list(landlord_options.keys()),
-        format_func=lambda x: landlord_options[x],
+        format_func=lambda x: landlord_options[x]
     )
 
     selected_landlord = next((l for l in landlords if l["id"] == selected_id), None)
@@ -705,9 +740,9 @@ def page_landlords():
     default_bank_idx = bank_keys.index(current_bank) if current_bank in bank_keys else 0
 
     if selected_landlord and selected_landlord.get("paystack_subaccount_code"):
-        st.success(f"Paystack Subaccount Linked: `{selected_landlord['paystack_subaccount_code']}`")
+        st.success(f"✅ Paystack Subaccount Linked: `{selected_landlord['paystack_subaccount_code']}`")
     elif selected_landlord:
-        st.warning("No Paystack Subaccount generated yet. Save payout details to enable automatic splits.")
+        st.warning("⚠️ No Paystack Subaccount generated yet. Save payout details to enable automatic splits.")
 
     with st.form("landlord_payout_form", clear_on_submit=False):
         col1, col2 = st.columns(2)
@@ -722,7 +757,7 @@ def page_landlords():
             account_number = st.text_input(
                 "Account / Mobile Money Number *",
                 value=default_account,
-                help="Enter Mobile Money number or Bank Account number",
+                help="Enter Mobile Money number or Bank Account number"
             )
             selected_bank_code = GHANA_PAYOUT_BANKS[bank_name]
             st.text_input("Paystack Bank Code", value=selected_bank_code, disabled=True)
@@ -744,10 +779,10 @@ def page_landlords():
                             bank_name=bank_name,
                             account_number=account_number,
                             bank_code=selected_bank_code,
-                            platform_fee_pct=0.0,
+                            platform_fee_pct=0.0  # Adjust if taking a platform fee percentage
                         )
                     clear_cache()
-                    st.success(f"Landlord registered! Paystack Subaccount Code: `{code}`")
+                    st.success(f"✅ Landlord registered! Paystack Subaccount Code: `{code}`")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Failed to save details: {e}")
@@ -760,15 +795,15 @@ def page_landlords():
                 c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
                 with c1:
                     st.markdown(f"**{l.get('name', 'Unnamed')}**")
-                    if l.get("email"):
+                    if l.get('email'):
                         st.caption(f"Email: {l['email']}")
-                    if l.get("phone"):
+                    if l.get('phone'):
                         st.caption(f"Phone: {l['phone']}")
                 with c2:
                     st.markdown(f"Provider: **{l.get('bank_name', '-')}**")
                     st.caption(f"Account: {l.get('account_number', '-')}")
                 with c3:
-                    sub_code = l.get("paystack_subaccount_code")
+                    sub_code = l.get('paystack_subaccount_code')
                     if sub_code:
                         st.markdown(f"Subaccount: `{sub_code}`")
                     else:
@@ -861,10 +896,12 @@ def page_payments():
     header()
     st.subheader("Payments Management & Checkout")
 
-    # --- 1. Paystack Payment Return & Verification ---
+    # --- 1. Automated Paystack Payment Return & Verification Handler ---
     query_params = st.query_params
-    if "reference" in query_params or "trxref" in query_params:
-        reference = query_params.get("reference") or query_params.get("trxref")
+    ref_param = query_params.get("reference") or query_params.get("trxref")
+
+    if ref_param and not str(ref_param).startswith("AD-"):
+        reference = str(ref_param)
 
         with st.spinner("Verifying Paystack transaction status..."):
             verification = verify_paystack_payment(reference)
@@ -880,23 +917,23 @@ def page_payments():
                         "payment_method": data.get("channel", "online_paystack"),
                         "notes": f"Paystack Ref: {reference} | Email: {data.get('customer', {}).get('email')}",
                         "payment_date": str(date.today()),
-                        "status": "paid",
+                        "status": "paid"
                     }).execute()
 
                     clear_cache()
-                    st.success(f"Payment of GHS {data['amount'] / 100:,.2f} verified and recorded successfully!")
+                    st.success(f"✅ Payment of GHS {data['amount']/100:,.2f} verified and recorded successfully!")
                 except Exception as e:
                     st.error(f"Error logging payment to database: {e}")
             else:
-                st.error("Payment verification failed or transaction was cancelled.")
+                st.error("❌ Payment verification failed or transaction was cancelled.")
 
             st.query_params.clear()
 
-    # --- 2. Online Payment Gateway Form ---
+    # --- 2. Online Payment Gateway Form (Card / Momo / Bank Transfer) ---
     tenants = fetch_tenants()
     tenant_options = {t["id"]: f"{tenant_label(t)} ({t.get('email', 'No email')})" for t in tenants} or {"": "No active tenants"}
 
-    with st.expander("Make Online Payment (Card / Momo / Bank Transfer)", expanded=True):
+    with st.expander("💳 Make Online Payment (Card / Momo / Bank Transfer)", expanded=True):
         st.caption("Process live payments securely via Paystack.")
 
         with st.form("paystack_payment_form"):
@@ -905,7 +942,7 @@ def page_payments():
                 selected_tenant_id = st.selectbox(
                     "Select Tenant *",
                     list(tenant_options.keys()),
-                    format_func=lambda x: tenant_options.get(x, "-"),
+                    format_func=lambda x: tenant_options.get(x, "-")
                 )
                 pay_amount = st.number_input("Amount (GHS) *", min_value=1.0, value=100.0, step=10.0)
 
@@ -924,23 +961,23 @@ def page_payments():
                         email=pay_email,
                         amount_in_ghs=pay_amount,
                         callback_url=callback_domain,
-                        metadata=meta,
+                        metadata=meta
                     )
 
                     if res.get("status"):
                         auth_url = res["data"]["authorization_url"]
                         st.success("Checkout initialized! Click the button below to complete your payment.")
                         st.link_button(
-                            "Pay Now via Card / Mobile Money / Transfer",
+                            "💳 Pay Now via Card / Mobile Money / Transfer",
                             auth_url,
                             type="primary",
-                            use_container_width=True,
+                            use_container_width=True
                         )
                     else:
                         st.error(f"Failed to initialize payment: {res.get('message', 'Unknown error')}")
 
     # --- 3. Manual Record Form (Cash/Offline) ---
-    with st.expander("Record Offline Payment (Cash, Check, Manual)", expanded=False):
+    with st.expander("📝 Record Offline Payment (Cash, Check, Manual)", expanded=False):
         with st.form("add_payment"):
             col1, col2 = st.columns(2)
             with col1:
@@ -986,15 +1023,15 @@ def page_payments():
                 tenant = p.get("tenants")
                 st.markdown(f"**{tenant_label(tenant)}**")
                 if p.get("notes"):
-                    st.caption(f"{p['notes']}")
+                    st.caption(f"📝 {p['notes']}")
             with col2:
                 st.markdown(f"Amount: **{fmt_money(p.get('amount'))}**")
             with col3:
                 st.markdown(f"Date: {fmt_date(p.get('payment_date'))}")
             with col4:
-                status_val = str(p.get("status", "-")).capitalize()
+                status_val = str(p.get('status', '-')).capitalize()
                 st.markdown(f"Status: **{status_val}**")
-                method_val = (p.get("payment_method") or "-").replace("_", " ").title()
+                method_val = (p.get('payment_method') or '-').replace('_', ' ').title()
                 st.caption(f"Method: {method_val}")
             with col5:
                 if st.button("Delete", key=f"del_pay_{p['id']}", type="secondary"):
@@ -1137,17 +1174,21 @@ def page_settings():
     header()
     st.subheader("Settings & Administration")
 
-    # --- Ad Payment Verification Handler ---
+    # --- Verification Handler for Ad Payment Return ---
     query_params = st.query_params
-    if "reference" in query_params and query_params.get("reference", "").startswith("AD-"):
-        ad_ref = query_params.get("reference")
+    ref_param = query_params.get("reference") or query_params.get("trxref")
+
+    if ref_param and str(ref_param).startswith("AD-"):
+        ad_ref = str(ref_param)
         with st.spinner("Verifying Advert Payment..."):
             verification = verify_paystack_payment(ad_ref)
             if verification.get("status") and verification.get("data", {}).get("status") == "success":
+                # Update status in DB
                 sb.table("ads").update({"status": "paid"}).eq("reference", ad_ref).execute()
-                st.success(f"Payment for Advert (Ref: `{ad_ref}`) verified successfully! Campaign is ready.")
+                clear_cache()
+                st.success(f"✅ Payment for Advert (Ref: `{ad_ref}`) verified successfully! Campaign is active.")
             else:
-                st.error("Advert payment verification failed or was cancelled.")
+                st.error("❌ Advert payment verification failed or was cancelled.")
         st.query_params.clear()
 
     with st.container(border=True):
@@ -1183,7 +1224,7 @@ def page_settings():
     with st.container(border=True):
         col_p1, col_p2 = st.columns(2)
         with col_p1:
-            st.selectbox("Default Currency Format", ["GHS (GH)", "USD ($)", "EUR ()"], index=0)
+            st.selectbox("Default Currency Format", ["GHS (GH₵)", "USD ($)", "EUR (€)"], index=0)
             st.selectbox("Date Format Standard", ["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"], index=0)
         with col_p2:
             st.selectbox("Records Per Page Display", [10, 25, 50, 100], index=1)
@@ -1199,11 +1240,12 @@ def page_settings():
 
     with st.container(border=True):
         tab_active_ads, tab_new_ad, tab_ad_analytics = st.tabs([
-            "Active Ad Placements",
-            "Create & Pay for Advert",
-            "Monetization & Analytics",
+            "📢 Active Ad Placements",
+            "💳 Create & Pay for Advert",
+            "📊 Monetization & Analytics"
         ])
 
+        # TAB 1: Display Ads from Database
         with tab_active_ads:
             st.markdown("##### Current Banner Placements")
             ads_list = fetch_ads()
@@ -1223,17 +1265,19 @@ def page_settings():
                             st.caption(f"Ref: `{ad.get('reference', 'N/A')}`")
                         with col3:
                             st.caption(f"Schedule: {fmt_date(ad.get('start_date'))} to {fmt_date(ad.get('end_date'))}")
-                            badge_color = "green" if ad.get("status") in ("paid", "active") else "orange"
+                            badge_color = "green" if ad.get('status') in ('paid', 'active') else "orange"
                             st.markdown(f"Status: :{badge_color}[**{str(ad.get('status')).upper()}**]")
                         with col4:
                             if st.button("Delete", key=f"del_ad_{ad['id']}", type="secondary"):
                                 sb.table("ads").delete().eq("id", ad["id"]).execute()
-                                fetch_ads.clear()
+                                clear_cache()
                                 st.rerun()
 
+        # TAB 2: Advert Setup & Paystack Payment
         with tab_new_ad:
             st.markdown("##### Add Sponsored Campaign")
 
+            # Initialize Streamlit Session State keys for payment persistence
             if "ad_checkout_url" not in st.session_state:
                 st.session_state.ad_checkout_url = None
             if "ad_checkout_ref" not in st.session_state:
@@ -1248,7 +1292,7 @@ def page_settings():
                         "Top Header Leaderboard (728x90)",
                         "Sidebar Banner (300x250)",
                         "Footer Promotional Bar (Full Width)",
-                        "In-Feed Property Listing Sponsor",
+                        "In-Feed Property Listing Sponsor"
                     ])
                     start_date = st.date_input("Campaign Start Date", value=date.today())
 
@@ -1260,7 +1304,7 @@ def page_settings():
 
                 callback_url = st.text_input("Callback Base URL", value="https://www.rentmastergh.com")
 
-                submit_ad = st.form_submit_button("Pay Now & Launch Campaign", type="primary", use_container_width=True)
+                submit_ad = st.form_submit_button("💳 Pay Now & Launch Campaign", type="primary", use_container_width=True)
 
                 if submit_ad:
                     if not client_name or not advertiser_email or not target_url or not creative_url:
@@ -1279,29 +1323,31 @@ def page_settings():
                                     destination_url=target_url,
                                     creative_url=creative_url,
                                     email=advertiser_email,
-                                    callback_url=callback_url,
+                                    callback_url=callback_url
                                 )
 
                                 if ps_res.get("status"):
                                     st.session_state.ad_checkout_url = ps_res["data"]["authorization_url"]
                                     st.session_state.ad_checkout_ref = ref
-                                    fetch_ads.clear()
+                                    clear_cache()
                                     st.success("Advert created! Click the Pay button below to complete payment.")
                                 else:
                                     st.error(f"Paystack Initialization Failed: {ps_res.get('message')}")
                             except Exception as e:
                                 st.error(f"Error processing advert checkout: {e}")
 
+            # Renders persistent link button outside the form so it stays visible
             if st.session_state.ad_checkout_url:
                 st.markdown("---")
                 st.info(f"Transaction Reference Generated: `{st.session_state.ad_checkout_ref}`")
                 st.link_button(
-                    "Proceed to Pay Now (Card / Mobile Money)",
+                    "👉 Proceed to Pay Now (Card / Mobile Money)",
                     st.session_state.ad_checkout_url,
                     type="primary",
-                    use_container_width=True,
+                    use_container_width=True
                 )
 
+        # TAB 3: Analytics
         with tab_ad_analytics:
             st.markdown("##### Ad Revenue & Impression Performance")
             m1, m2, m3 = st.columns(3)
@@ -1317,27 +1363,27 @@ def page_settings():
     col1, col2, col3 = st.columns(3)
     with col1:
         st.download_button(
-            "Export Properties",
+            "📥 Export Properties",
             data=json.dumps(fetch_properties(), indent=2),
             file_name="rentmaster_properties.json",
             mime="application/json",
-            use_container_width=True,
+            use_container_width=True
         )
     with col2:
         st.download_button(
-            "Export Payments",
+            "📥 Export Payments",
             data=json.dumps(fetch_payments(), indent=2),
             file_name="rentmaster_payments.json",
             mime="application/json",
-            use_container_width=True,
+            use_container_width=True
         )
     with col3:
         st.download_button(
-            "Export Tenants",
+            "📥 Export Tenants",
             data=json.dumps(fetch_tenants(), indent=2),
             file_name="rentmaster_tenants.json",
             mime="application/json",
-            use_container_width=True,
+            use_container_width=True
         )
 
 
@@ -1360,19 +1406,20 @@ with st.sidebar:
     selection = st.radio("Go to", list(PAGES.keys()))
 
     st.markdown("---")
-    if st.button("Support & Suggestions", use_container_width=True):
+    if st.button("💬 Support & Suggestions", use_container_width=True):
         show_support_dialog()
 
     st.markdown("---")
     if st.session_state.user:
         user_email = getattr(st.session_state.user, "email", "User")
-        st.write(f"Logged in: **{user_email}**")
+        st.write(f"👤 Logged in: **{user_email}**")
         if st.button("Logout", key="logout_btn"):
             sb.auth.sign_out()
             st.session_state.clear()
             st.rerun()
 
     st.markdown("---")
-    st.caption("RentMaster-GH v2 - Streamlit + Supabase")
+    st.caption("RentMaster-GH v2 • Streamlit + Supabase")
 
+# Execute active page
 PAGES[selection]()
