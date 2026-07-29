@@ -2,7 +2,7 @@
 RentMaster-GH v2 - Rental Management Streamlit Web App
 Full interactive UI backed by Supabase. Manages properties, tenants,
 payments, leases, maintenance requests, and landlords with a dashboard overview.
-Includes Paystack Integration for Cards, Mobile Money (Momo), Bank Transfer, and Split Payouts.
+Includes Paystack Integration for Cards, Mobile Money (Momo), Bank Transfer, Rent Ledgers, and Split Payouts.
 """
 
 import json
@@ -115,10 +115,11 @@ def create_paystack_subaccount(business_name: str, bank_code: str, account_numbe
         return {"status": False, "message": str(e)}
 
 
-def initialize_paystack_payment(email: str, amount_in_ghs: float, callback_url: str, metadata: dict = None):
+def initialize_paystack_payment(email: str, amount_in_ghs: float, callback_url: str, metadata: dict = None, subaccount: str = None):
     """
     Initializes a transaction with Paystack API.
-    Amount is converted to subunit (Pesewas/Kobo) by multiplying by 100.
+    Amount is converted to subunit (Pesewas) by multiplying by 100.
+    Supports optional subaccount parameter for direct landlord payouts.
     """
     if not PAYSTACK_SECRET_KEY:
         return {"status": False, "message": "PAYSTACK_SECRET_KEY is not configured in secrets or environment."}
@@ -136,6 +137,9 @@ def initialize_paystack_payment(email: str, amount_in_ghs: float, callback_url: 
         "channels": ["card", "mobile_money", "bank_transfer"],
         "metadata": metadata or {}
     }
+
+    if subaccount:
+        payload["subaccount"] = subaccount
 
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=10)
@@ -167,7 +171,6 @@ def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: s
     1. Calls Paystack API to create subaccount.
     2. Saves landlord info and subaccount_code to Supabase.
     """
-    # 1. Trigger automatic subaccount creation on Paystack
     ps_res = create_paystack_subaccount(
         business_name=name,
         bank_code=bank_code,
@@ -182,7 +185,6 @@ def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: s
 
     subaccount_code = ps_res["data"]["subaccount_code"]
 
-    # 2. Save payload including subaccount_code to Supabase
     payload = {
         "name": name,
         "email": email if email else None,
@@ -411,7 +413,7 @@ def show_support_dialog():
 
 
 # ---------------------------------------------------------------------------
-# Data Helpers
+# Data Helpers & Rent Ledger Calculations
 # ---------------------------------------------------------------------------
 
 @st.cache_data(ttl=5)
@@ -431,8 +433,15 @@ def fetch_landlords():
 
 @st.cache_data(ttl=5)
 def fetch_tenants():
-    r = sb.table("tenants").select("*, properties(*)").order("created_at", desc=True).execute()
-    return r.data or []
+    try:
+        r = sb.table("tenants").select("*, properties(*, landlords(*))").order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception:
+        try:
+            r = sb.table("tenants").select("*, properties(*)").order("created_at", desc=True).execute()
+            return r.data or []
+        except Exception:
+            return []
 
 
 @st.cache_data(ttl=5)
@@ -533,6 +542,137 @@ def tenant_label(t):
     return t.get("name", "Unnamed")
 
 
+def compute_tenant_ledger(tenant: dict, all_payments: list):
+    """
+    Computes tenant statement metrics and line items.
+    """
+    if not tenant:
+        return {"monthly_rent": 0.0, "total_charged": 0.0, "total_paid": 0.0, "balance": 0.0, "statement": [], "tenant_payments": []}
+
+    monthly_rent = float(tenant.get("rent_amount") or 0.0)
+    lease_start_str = tenant.get("lease_start")
+
+    statement = []
+    total_charged = 0.0
+
+    # 1. Generate Month-by-Month Charges based on Lease Start Date
+    if lease_start_str:
+        try:
+            start_dt = date.fromisoformat(str(lease_start_str)[:10])
+            today_dt = date.today()
+
+            # Calculate total months elapsed
+            months_count = (today_dt.year - start_dt.year) * 12 + (today_dt.month - start_dt.month) + 1
+            months_count = max(1, months_count)
+
+            curr_dt = start_dt
+            for _ in range(months_count):
+                due_date_str = curr_dt.strftime("%Y-%m-01")
+                charge_amt = monthly_rent
+                total_charged += charge_amt
+                statement.append({
+                    "date": due_date_str,
+                    "type": "Rent Charge",
+                    "description": f"Monthly Rent ({curr_dt.strftime('%B %Y')})",
+                    "charge": charge_amt,
+                    "credit": 0.0,
+                    "ref": "-"
+                })
+                # Advance month
+                y = curr_dt.year + (curr_dt.month // 12)
+                m = (curr_dt.month % 12) + 1
+                curr_dt = date(y, m, 1)
+        except Exception:
+            total_charged = monthly_rent
+    else:
+        total_charged = monthly_rent
+
+    # 2. Add Paid Transactions
+    tenant_id = tenant.get("id")
+    tenant_payments = [p for p in all_payments if p.get("tenant_id") == tenant_id and p.get("status") == "paid"]
+    total_paid = sum(float(p.get("amount") or 0.0) for p in tenant_payments)
+
+    for p in tenant_payments:
+        statement.append({
+            "date": fmt_date(p.get("payment_date")),
+            "type": "Rent Payment",
+            "description": f"Payment ({str(p.get('payment_method', 'online')).replace('_', ' ').title()})",
+            "charge": 0.0,
+            "credit": float(p.get("amount") or 0.0),
+            "ref": p.get("notes", "-")
+        })
+
+    # Sort statement by date
+    statement.sort(key=lambda x: str(x["date"]))
+
+    # 3. Compute Running Balance
+    running_balance = 0.0
+    for item in statement:
+        running_balance += (item["charge"] - item["credit"])
+        item["balance"] = running_balance
+
+    balance = total_charged - total_paid
+
+    return {
+        "monthly_rent": monthly_rent,
+        "total_charged": total_charged,
+        "total_paid": total_paid,
+        "balance": balance,
+        "statement": statement,
+        "tenant_payments": tenant_payments
+    }
+
+
+def generate_receipt_html(tenant: dict, payment: dict, property_obj: dict = None):
+    """
+    Generates a formal HTML Rent Payment Receipt.
+    """
+    amount_str = fmt_money(payment.get("amount", 0))
+    p_date = fmt_date(payment.get("payment_date"))
+    p_ref = payment.get("notes") or payment.get("id", "N/A")
+    t_name = tenant.get("name", "Valued Tenant")
+    p_name = prop_label(property_obj) if property_obj else "RentMaster-GH Property"
+
+    receipt_html = f"""
+    <div style="border: 2px solid #0f4c75; padding: 25px; border-radius: 12px; background-color: #ffffff; color: #1e293b; max-width: 600px; margin: 0 auto; font-family: sans-serif;">
+        <div style="text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px;">
+            <h2 style="color: #0f4c75; margin: 0;">RentMaster-GH Official Receipt</h2>
+            <p style="color: #64748b; margin: 5px 0 0 0; font-size: 0.9rem;">Proof of Rent Payment</p>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+            <tr>
+                <td style="padding: 8px 0; color: #64748b;">Receipt Reference:</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: bold;">{p_ref}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; color: #64748b;">Payment Date:</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: bold;">{p_date}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; color: #64748b;">Tenant Name:</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: bold;">{t_name}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; color: #64748b;">Property:</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: bold;">{p_name}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; color: #64748b;">Payment Method:</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: bold;">{(payment.get('payment_method') or 'Paystack').replace('_', ' ').title()}</td>
+            </tr>
+            <tr style="border-top: 2px solid #e2e8f0; border-bottom: 2px solid #e2e8f0;">
+                <td style="padding: 15px 0; font-size: 1.1rem; font-weight: bold; color: #0f4c75;">Amount Paid:</td>
+                <td style="padding: 15px 0; text-align: right; font-size: 1.3rem; font-weight: bold; color: #166534;">{amount_str}</td>
+            </tr>
+        </table>
+        <div style="text-align: center; margin-top: 25px; color: #94a3b8; font-size: 0.8rem;">
+            Thank you for your payment! Powered by RentMaster-GH & Paystack.
+        </div>
+    </div>
+    """
+    return receipt_html
+
+
 # ---------------------------------------------------------------------------
 # Ad Management Helpers
 # ---------------------------------------------------------------------------
@@ -556,7 +696,7 @@ def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float,
         "reference": reference,
     }
 
-    # 1. Insert into Supabase 'ads' table (Strict schema match)
+    # 1. Insert into Supabase 'ads' table
     sb.table("ads").insert(ad_payload).execute()
 
     # 2. Call Paystack API
@@ -895,7 +1035,7 @@ def page_tenants():
 
 def page_payments():
     header()
-    st.subheader("Payments Management & Checkout")
+    st.subheader("Rent Ledger & Payments Hub")
 
     # --- 1. Automated Paystack Payment Return & Verification Handler ---
     query_params = st.query_params
@@ -922,7 +1062,7 @@ def page_payments():
                     }).execute()
 
                     clear_cache()
-                    st.success(f"✅ Payment of GHS {data['amount']/100:,.2f} verified and recorded successfully!")
+                    st.success(f"✅ Rent Payment of GHS {data['amount']/100:,.2f} verified and credited to ledger!")
                 except Exception as e:
                     st.error(f"Error logging payment to database: {e}")
             else:
@@ -930,68 +1070,144 @@ def page_payments():
 
             st.query_params.clear()
 
-    # --- 2. Online Payment Gateway Form (Card / Momo / Bank Transfer) ---
     tenants = fetch_tenants()
-    tenant_options = {t["id"]: f"{tenant_label(t)} ({t.get('email', 'No email')})" for t in tenants} or {"": "No active tenants"}
+    all_payments = fetch_payments()
 
-    with st.expander("💳 Make Online Payment (Card / Momo / Bank Transfer)", expanded=True):
-        st.caption("Process live payments securely via Paystack.")
+    tab_ledger, tab_manual, tab_log = st.tabs([
+        "📜 Tenant Rent Ledger & Pay Rent",
+        "📝 Record Offline Payment",
+        "📊 Master Payment Log & Receipts"
+    ])
 
-        with st.form("paystack_payment_form"):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                selected_tenant_id = st.selectbox(
-                    "Select Tenant *",
-                    list(tenant_options.keys()),
-                    format_func=lambda x: tenant_options.get(x, "-")
-                )
-                pay_amount = st.number_input("Amount (GHS) *", min_value=1.0, value=100.0, step=10.0)
+    # =========================================================================
+    # TAB 1: TENANT RENT LEDGER & LIVE PAYSTACK RENT CHECKOUT
+    # =========================================================================
+    with tab_ledger:
+        if not tenants:
+            st.info("No active tenants found. Add a tenant to view their rent ledger.")
+        else:
+            tenant_map = {t["id"]: f"{t.get('name')} — {prop_label(t.get('properties'))}" for t in tenants}
+            selected_tenant_id = st.selectbox(
+                "Select Tenant Ledger",
+                options=list(tenant_map.keys()),
+                format_func=lambda x: tenant_map[x],
+                key="ledger_tenant_select"
+            )
 
-            with col_b:
-                pay_email = st.text_input("Receipt Email *", placeholder="tenant@example.com")
-                callback_domain = st.text_input("Callback Base URL", value="https://www.rentmastergh.com")
+            selected_tenant = next((t for t in tenants if t["id"] == selected_tenant_id), None)
+            ledger = compute_tenant_ledger(selected_tenant, all_payments)
 
-            pay_submitted = st.form_submit_button("Proceed to Checkout", type="primary", use_container_width=True)
+            # Metric Summary Bar
+            st.markdown("---")
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Agreed Monthly Rent", fmt_money(ledger["monthly_rent"]))
+            m2.metric("Total Rent Charged", fmt_money(ledger["total_charged"]))
+            m3.metric("Total Amount Paid", fmt_money(ledger["total_paid"]))
 
-            if pay_submitted:
-                if not pay_email:
-                    st.error("Please provide a receipt email address.")
+            bal_color = "red" if ledger["balance"] > 0 else "green"
+            bal_label = "Outstanding Due" if ledger["balance"] > 0 else "Credit / Up-to-date"
+            m4.metric("Ledger Balance", fmt_money(abs(ledger["balance"])), delta=f":{bal_color}[{bal_label}]")
+
+            st.markdown("---")
+
+            # --- Live Paystack Rent Checkout Box ---
+            with st.container(border=True):
+                st.markdown("#### 💳 Pay Rent Online (Mobile Money / Card / Bank Transfer)")
+                st.caption("Process live rent payments securely via Paystack with automated landlord payout routing.")
+
+                # Extract linked Landlord Paystack Subaccount Code if present
+                prop_obj = selected_tenant.get("properties") if selected_tenant else None
+                landlord_obj = prop_obj.get("landlords") if (prop_obj and isinstance(prop_obj, dict)) else None
+                subaccount_code = landlord_obj.get("paystack_subaccount_code") if landlord_obj else None
+
+                if subaccount_code:
+                    st.info(f"⚡ **Direct Landlord Split Payout Enabled:** Funds will be routed directly to Landlord `{landlord_obj.get('name')}` (`{subaccount_code}`).")
                 else:
-                    meta = {"tenant_id": selected_tenant_id} if selected_tenant_id else {}
-                    res = initialize_paystack_payment(
-                        email=pay_email,
-                        amount_in_ghs=pay_amount,
-                        callback_url=callback_domain,
-                        metadata=meta
-                    )
+                    st.caption("ℹ️ Standard platform collection (Landlord payout details unlinked).")
 
-                    if res.get("status"):
-                        auth_url = res["data"]["authorization_url"]
-                        st.success("Checkout initialized! Click the button below to complete your payment.")
-                        st.link_button(
-                            "💳 Pay Now via Card / Mobile Money / Transfer",
-                            auth_url,
-                            type="primary",
-                            use_container_width=True
-                        )
-                    else:
-                        st.error(f"Failed to initialize payment: {res.get('message', 'Unknown error')}")
+                with st.form("rent_checkout_form"):
+                    col_p1, col_p2 = st.columns(2)
+                    with col_p1:
+                        default_pay_amount = max(ledger["balance"], ledger["monthly_rent"])
+                        pay_amount = st.number_input("Payment Amount (GHS) *", min_value=1.0, value=float(default_pay_amount) if default_pay_amount > 0 else 100.0, step=50.0)
+                    with col_p2:
+                        tenant_email = selected_tenant.get("email") or ""
+                        receipt_email = st.text_input("Receipt Email *", value=tenant_email, placeholder="tenant@example.com")
 
-    # --- 3. Manual Record Form (Cash/Offline) ---
-    with st.expander("📝 Record Offline Payment (Cash, Check, Manual)", expanded=False):
-        with st.form("add_payment"):
+                    callback_domain = st.text_input("Callback Base URL", value="https://www.rentmastergh.com")
+                    proceed_pay = st.form_submit_button("💳 Proceed to Live Paystack Checkout", type="primary", use_container_width=True)
+
+                    if proceed_pay:
+                        if not receipt_email:
+                            st.error("Please enter a valid receipt email.")
+                        else:
+                            with st.spinner("Initializing secure Paystack checkout..."):
+                                res = initialize_paystack_payment(
+                                    email=receipt_email,
+                                    amount_in_ghs=pay_amount,
+                                    callback_url=callback_domain,
+                                    metadata={
+                                        "type": "rent_payment",
+                                        "tenant_id": selected_tenant_id,
+                                        "tenant_name": selected_tenant.get("name")
+                                    },
+                                    subaccount=subaccount_code
+                                )
+
+                                if res.get("status"):
+                                    auth_url = res["data"]["authorization_url"]
+                                    st.success("Checkout initialized! Click below to complete your payment.")
+                                    st.link_button(
+                                        "👉 Click Here to Pay Now via Mobile Money / Card",
+                                        auth_url,
+                                        type="primary",
+                                        use_container_width=True
+                                    )
+                                else:
+                                    st.error(f"Failed to initialize payment: {res.get('message', 'Unknown error')}")
+
+            # --- Itemized Statement of Account Table ---
+            st.markdown("#### 📋 Itemized Rent Ledger Statement")
+
+            if not ledger["statement"]:
+                st.info("No charges or payments recorded on this ledger.")
+            else:
+                formatted_statement = []
+                for idx, row in enumerate(ledger["statement"], 1):
+                    formatted_statement.append({
+                        "#": idx,
+                        "Date": row["date"],
+                        "Type": row["type"],
+                        "Description": row["description"],
+                        "Charge (GHS)": f"{row['charge']:,.2f}" if row['charge'] > 0 else "-",
+                        "Credit (GHS)": f"{row['credit']:,.2f}" if row['credit'] > 0 else "-",
+                        "Balance (GHS)": f"{row['balance']:,.2f}",
+                        "Reference": row["ref"]
+                    })
+                st.dataframe(formatted_statement, use_container_width=True, hide_index=True)
+
+    # =========================================================================
+    # TAB 2: MANUAL / OFFLINE PAYMENT RECORDING
+    # =========================================================================
+    with tab_manual:
+        st.markdown("##### 📝 Record Offline Payment (Cash, Check, Bank Deposit)")
+
+        tenant_options = {t["id"]: f"{tenant_label(t)} ({t.get('email', 'No email')})" for t in tenants} or {"": "No active tenants"}
+
+        with st.form("add_offline_payment_form"):
             col1, col2 = st.columns(2)
             with col1:
                 tid = st.selectbox("Tenant *", list(tenant_options.keys()),
                                    format_func=lambda x: tenant_options.get(x, "-"), key="manual_tid")
-                amount = st.number_input("Amount (GHs) *", min_value=0.0, value=0.0, step=10.0, key="manual_amt")
+                amount = st.number_input("Amount (GHs) *", min_value=1.0, value=100.0, step=10.0, key="manual_amt")
                 method = st.selectbox("Payment Method *", ["cash", "card", "bank_transfer", "mobile_money", "check", "other"])
             with col2:
                 pdate = st.date_input("Payment Date *", value=date.today())
                 status = st.selectbox("Status *", ["paid", "pending", "overdue", "cancelled"])
 
-            notes = st.text_area("Notes", help="Optional transaction notes, receipt numbers, or comments.")
-            submitted = st.form_submit_button("Record Payment")
+            notes = st.text_area("Notes / Reference", help="Receipt number, bank deposit slip number, or notes.")
+            submitted = st.form_submit_button("Record Payment in Ledger", type="primary")
+
             if submitted:
                 if not tid or amount <= 0:
                     st.error("Select a tenant and enter a valid amount.")
@@ -1000,45 +1216,58 @@ def page_payments():
                         "tenant_id": tid,
                         "amount": float(amount),
                         "payment_method": method,
-                        "notes": notes if notes else None,
+                        "notes": notes if notes else "Manual Entry",
                         "payment_date": str(pdate),
                         "status": status,
                     }).execute()
                     clear_cache()
-                    st.success("Payment recorded successfully.")
+                    st.success("✅ Payment recorded into ledger successfully.")
                     st.rerun()
 
-    # --- 4. Payment History Table ---
-    payments = fetch_payments()
-    if not payments:
-        st.info("No payments recorded yet.")
-        return
+    # =========================================================================
+    # TAB 3: MASTER LOG & DIGITAL RECEIPT GENERATOR
+    # =========================================================================
+    with tab_log:
+        st.markdown("##### 📊 Transaction Log & Digital Receipts")
 
-    st.markdown("---")
-    st.markdown(f"**{len(payments)} Payment Records**")
+        if not all_payments:
+            st.info("No payment transactions found in database.")
+        else:
+            st.markdown(f"**Total Records:** `{len(all_payments)}`")
 
-    for p in payments:
-        with st.container(border=True):
-            col1, col2, col3, col4, col5 = st.columns([2.5, 2, 2, 2.5, 1])
-            with col1:
-                tenant = p.get("tenants")
-                st.markdown(f"**{tenant_label(tenant)}**")
-                if p.get("notes"):
-                    st.caption(f"📝 {p['notes']}")
-            with col2:
-                st.markdown(f"Amount: **{fmt_money(p.get('amount'))}**")
-            with col3:
-                st.markdown(f"Date: {fmt_date(p.get('payment_date'))}")
-            with col4:
-                status_val = str(p.get('status', '-')).capitalize()
-                st.markdown(f"Status: **{status_val}**")
-                method_val = (p.get('payment_method') or '-').replace('_', ' ').title()
-                st.caption(f"Method: {method_val}")
-            with col5:
-                if st.button("Delete", key=f"del_pay_{p['id']}", type="secondary"):
-                    sb.table("payments").delete().eq("id", p["id"]).execute()
-                    clear_cache()
-                    st.rerun()
+            for p in all_payments:
+                with st.container(border=True):
+                    col1, col2, col3, col4, col5 = st.columns([2.5, 2, 2, 2, 1.5])
+                    t_obj = p.get("tenants")
+                    with col1:
+                        st.markdown(f"**{tenant_label(t_obj)}**")
+                        if p.get("notes"):
+                            st.caption(f"📝 {p['notes']}")
+                    with col2:
+                        st.markdown(f"Amount: **{fmt_money(p.get('amount'))}**")
+                    with col3:
+                        st.markdown(f"Date: {fmt_date(p.get('payment_date'))}")
+                    with col4:
+                        st.markdown(f"Status: **{str(p.get('status')).upper()}**")
+                        st.caption(f"Method: {(p.get('payment_method') or 'online').replace('_', ' ').title()}")
+                    with col5:
+                        c_rec, c_del = st.columns(2)
+                        with c_rec:
+                            if p.get("status") == "paid":
+                                prop_obj = t_obj.get("properties") if (t_obj and isinstance(t_obj, dict)) else None
+                                receipt_html = generate_receipt_html(t_obj or {}, p, prop_obj)
+                                st.download_button(
+                                    "🧾 Receipt",
+                                    data=receipt_html,
+                                    file_name=f"RentReceipt_{fmt_date(p.get('payment_date'))}_{p.get('id')[:6]}.html",
+                                    mime="text/html",
+                                    key=f"rec_btn_{p['id']}"
+                                )
+                        with c_del:
+                            if st.button("Delete", key=f"del_pay_{p['id']}", type="secondary"):
+                                sb.table("payments").delete().eq("id", p["id"]).execute()
+                                clear_cache()
+                                st.rerun()
 
 
 def page_leases():
