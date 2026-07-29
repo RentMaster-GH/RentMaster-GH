@@ -1,0 +1,17 @@
+.env
+.env.local
+.env.*.local
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.vercel/
+.DS_Store
+Thumbs.db
+.v3/
+package-lock.json
+package.json
+node_modules/
