@@ -536,7 +536,7 @@ def tenant_label(t):
 # ---------------------------------------------------------------------------
 # Ad Management Helpers
 # ---------------------------------------------------------------------------
-def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float, start_date: str, end_date: str, destination_url: str, creative_url: str, email: str, callback_url: str):
+def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float, start_date: str, end_date: str, destination_url: str, creative_url: str, email: str, callback_url: str, user_id: str = None):
     """
     1. Generates a unique transaction reference.
     2. Saves the ad record to Supabase with status = 'pending_payment'.
@@ -553,8 +553,11 @@ def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float,
         "destination_url": destination_url,
         "creative_url": creative_url,
         "status": "pending_payment",
-        "reference": reference
+        "reference": reference,
     }
+
+    if user_id:
+        ad_payload["user_id"] = user_id
 
     # 1. Insert into Supabase 'ads' table
     sb.table("ads").insert(ad_payload).execute()
@@ -568,7 +571,8 @@ def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float,
             "type": "advert_placement",
             "business_name": client_name,
             "ad_slot": ad_position,
-            "reference": reference
+            "reference": reference,
+            "user_id": user_id
         }
     )
 
@@ -1287,7 +1291,7 @@ def page_settings():
                 f1, f2 = st.columns(2)
                 with f1:
                     client_name = st.text_input("Advertiser / Business Name *", placeholder="e.g. Absa Bank Ghana")
-                    advertiser_email = st.text_input("Receipt / Contact Email *", value=user_email)
+                    advertiser_email = st.text_input("Receipt / Contact Email *", value=user_email if user_email != "Active Session" else "")
                     ad_position = st.selectbox("Target Ad Slot *", [
                         "Top Header Leaderboard (728x90)",
                         "Sidebar Banner (300x250)",
@@ -1314,6 +1318,7 @@ def page_settings():
                     else:
                         with st.spinner("Saving campaign & initializing Paystack checkout..."):
                             try:
+                                active_user_id = user_id if user_id != "N/A" else None
                                 ps_res, ref = initialize_ad_payment(
                                     client_name=client_name,
                                     ad_position=ad_position,
@@ -1323,7 +1328,8 @@ def page_settings():
                                     destination_url=target_url,
                                     creative_url=creative_url,
                                     email=advertiser_email,
-                                    callback_url=callback_url
+                                    callback_url=callback_url,
+                                    user_id=active_user_id
                                 )
 
                                 if ps_res.get("status"):
