@@ -1504,6 +1504,7 @@ def page_settings():
                                 st.rerun()
 
         # TAB 2: Advert Setup & Paystack Payment
+        # TAB 2: Advert Setup & Paystack Payment
         with tab_new_ad:
             st.markdown("##### Add Sponsored Campaign")
 
@@ -1534,6 +1535,16 @@ def page_settings():
 
                 callback_url = st.text_input("Callback Base URL", value="https://www.rentmastergh.com")
 
+                # =========================================================================
+                # 📍 OPTION 1 PLACEMENT: Calculate Prorated Cost & Display Summary
+                # =========================================================================
+                campaign_days = (end_date - start_date).days
+                daily_rate = pricing_rate / 30.0
+                total_campaign_cost = daily_rate * max(1, campaign_days)
+
+                st.info(f"📅 **Duration:** {max(1, campaign_days)} days | **Prorated Total Charge:** {fmt_money(total_campaign_cost)}")
+                # =========================================================================
+
                 submit_ad = st.form_submit_button("💳 Pay Now & Launch Campaign", type="primary", use_container_width=True)
 
                 if submit_ad:
@@ -1548,7 +1559,7 @@ def page_settings():
                                 ps_res, ref = initialize_ad_payment(
                                     client_name=client_name,
                                     ad_position=ad_position,
-                                    amount_ghs=pricing_rate,
+                                    amount_ghs=total_campaign_cost,  # 👈 Pass the prorated total cost here!
                                     start_date=str(start_date),
                                     end_date=str(end_date),
                                     destination_url=target_url,
