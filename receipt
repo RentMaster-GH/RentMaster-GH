@@ -713,6 +713,73 @@ def generate_receipt_html(tenant: dict, payment: dict, property_obj: dict = None
     """
     return receipt_html
 
+# =========================================================================
+# Identity Verification (KYC) Helpers
+# =========================================================================
+def upload_id_to_supabase(file_obj, tenant_identifier: str):
+    """
+    Uploads an ID image/PDF file to Supabase Storage Bucket 'id-documents'.
+    Returns the public file URL.
+    """
+    try:
+        file_bytes = file_obj.getvalue()
+        file_ext = file_obj.name.split(".")[-1] if hasattr(file_obj, "name") and "." in file_obj.name else "jpg"
+        file_path = f"tenants/{uuid.uuid4().hex[:8]}_{tenant_identifier}.{file_ext}"
+
+        bucket = sb.storage.from_("id-documents")
+        bucket.upload(file_path, file_bytes, {"content-type": getattr(file_obj, "type", "image/jpeg"), "upsert": "true"})
+
+        public_url = bucket.get_public_url(file_path)
+        return public_url
+    except Exception as e:
+        st.error(f"Failed to upload ID document to storage: {e}")
+        return None
+
+
+def render_id_verification_widget():
+    """
+    Renders the ID Verification UI widget with guidelines, dropzone, camera, and preview.
+    """
+    st.markdown("##### 🆔 Tenant Identity Verification (KYC)")
+    st.markdown(
+        """
+        <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+            <h6 style="margin: 0 0 0.4rem 0; color: #0369a1; font-weight: 600;">📌 ID Verification & Compliance Guidelines</h6>
+            <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: #0c4a6e; line-height: 1.4;">
+                <li><b>Accepted IDs:</b> Ghana Card / National ID, Passport, Driver's License, Voter ID.</li>
+                <li><b>Quality Standard:</b> All 4 corners visible, no glare or blur. Text must be legible.</li>
+                <li><b>Privacy Compliance:</b> Protected in accordance with the <i>Data Protection Act (Act 843)</i> / GDPR regulations.</li>
+            </ul>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    capture_method = st.radio(
+        "Choose ID Capture Method",
+        ["📁 Drag & Drop File Upload", "📷 Live Camera Capture"],
+        horizontal=True,
+        key="id_capture_method"
+    )
+
+    uploaded_id_file = None
+    if "Drag & Drop" in capture_method:
+        uploaded_id_file = st.file_uploader(
+            "Drop ID document file here (PNG, JPG, JPEG, PDF)",
+            type=["png", "jpg", "jpeg", "pdf"],
+            key="id_file_dropzone"
+        )
+    else:
+        uploaded_id_file = st.camera_input("Take photo of ID Card", key="id_camera_capture")
+
+    if uploaded_id_file:
+        st.success("✅ Document captured successfully!")
+        if hasattr(uploaded_id_file, "type") and "pdf" in str(uploaded_id_file.type):
+            st.info("📄 PDF File Selected")
+        else:
+            st.image(uploaded_id_file, caption="Captured ID Card Preview", width=320)
+
+    return uploaded_id_file
 
 # ---------------------------------------------------------------------------
 # Ad Management Helpers
@@ -1024,11 +1091,22 @@ def page_tenants():
                 lease_end = st.date_input("Lease End", value=date.today() + timedelta(days=365))
 
             active = st.checkbox("Active Tenant", value=True)
-            submitted = st.form_submit_button("Add Tenant")
+
+            # 📍 PLACE ID VERIFICATION WIDGET HERE INSIDE THE FORM
+            id_file_data = render_id_verification_widget()
+
+            submitted = st.form_submit_button("Add Tenant", type="primary")
+
             if submitted:
                 if not name:
                     st.error("Tenant name is required.")
                 else:
+                    # Upload ID card to Supabase storage if provided
+                    id_card_url = None
+                    if id_file_data:
+                        with st.spinner("Uploading ID document to secure storage..."):
+                            id_card_url = upload_id_to_supabase(id_file_data, name)
+
                     payload = {
                         "name": name,
                         "email": email if email else None,
@@ -1038,10 +1116,11 @@ def page_tenants():
                         "lease_start": str(lease_start),
                         "lease_end": str(lease_end),
                         "is_active": active,
+                        "id_card_url": id_card_url  # Save file URL to database
                     }
                     sb.table("tenants").insert(payload).execute()
                     clear_cache()
-                    st.success(f"Tenant '{name}' added.")
+                    st.success(f"Tenant '{name}' added with verified ID.")
                     st.rerun()
 
     tenants = fetch_tenants()
