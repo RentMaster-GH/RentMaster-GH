@@ -1,5 +1,5 @@
 """
-RentMaster Global - Worldwide Rental Property Management Web App
+RentMaster-GH - Rental Property Management Web App
 Full interactive UI backed by Supabase. Manages properties, tenants,
 payments, leases, maintenance requests, and landlords with a global dashboard overview.
 Includes Multi-Currency Paystack & International Card/MoMo Checkout & Split Payouts.
@@ -19,7 +19,7 @@ from streamlit.errors import StreamlitSecretNotFoundError
 # Streamlit Config (MUST BE FIRST STREAMLIT COMMAND)
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="RentMaster Global",
+    page_title="RentMaster-GH",
     page_icon=":house:",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -66,11 +66,11 @@ sb = get_client()
 # Global Multi-Currency Engine & International Payout Bank Systems
 # ---------------------------------------------------------------------------
 SUPPORTED_CURRENCIES = {
+    "GHS": {"symbol": "GHs", "name": "Ghanaian Cedi (GHs / GH₵)"},
     "USD": {"symbol": "$", "name": "US Dollar ($)"},
-    "GHS": {"symbol": "GH₵", "name": "Ghanaian Cedi (GH₵)"},
-    "NGN": {"symbol": "₦", "name": "Nigerian Naira (₦)"},
     "EUR": {"symbol": "€", "name": "Euro (€)"},
     "GBP": {"symbol": "£", "name": "British Pound (£)"},
+    "NGN": {"symbol": "₦", "name": "Nigerian Naira (₦)"},
     "KES": {"symbol": "KSh", "name": "Kenyan Shilling (KSh)"},
     "ZAR": {"symbol": "R", "name": "South African Rand (R)"},
     "CAD": {"symbol": "$", "name": "Canadian Dollar ($)"},
@@ -122,12 +122,12 @@ GLOBAL_PAYOUT_BANKS = {
 
 
 def get_current_currency():
-    return st.session_state.get("app_currency", "USD")
+    return st.session_state.get("app_currency", "GHS")
 
 
 def fmt_money(v, currency_code=None):
     code = currency_code or get_current_currency()
-    symbol = SUPPORTED_CURRENCIES.get(code, {}).get("symbol", "$")
+    symbol = SUPPORTED_CURRENCIES.get(code, {}).get("symbol", "GHs")
     try:
         return f"{symbol} {float(v):,.2f}"
     except (TypeError, ValueError):
@@ -178,7 +178,7 @@ def create_paystack_subaccount(business_name: str, bank_code: str, account_numbe
 def initialize_paystack_payment(email: str, amount_in_main_unit: float, callback_url: str, metadata: dict = None, subaccount: str = None, currency: str = None):
     """
     Initializes a global payment with Paystack API.
-    Supports multi-currency checkout (USD, EUR, GBP, GHS, NGN, KES, ZAR).
+    Supports multi-currency checkout (GHS, USD, EUR, GBP, NGN, KES, ZAR).
     """
     if not PAYSTACK_SECRET_KEY:
         return {"status": False, "message": "PAYSTACK_SECRET_KEY is not configured in secrets or environment."}
@@ -311,7 +311,7 @@ def auth_page():
                     text-align: center;
                 ">
                     <p style="margin: 0 0 0.4rem 0; font-weight: 600; color: #166534; font-size: 0.88rem;">
-                        Looking to make a global payment or support without logging in?
+                        Looking to make a payment or support without logging in?
                     </p>
                     <a href="https://paystack.shop/pay/zvx0npq7hv" 
                        target="_blank" 
@@ -327,14 +327,14 @@ def auth_page():
                            font-size: 0.88rem;
                            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
                        ">
-                        🌐 Make a Global Payment via Paystack / Card
+                        💙 Make a Payment / Donation via Paystack
                     </a>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-            st.markdown("<h2 style='text-align: center; margin-bottom: 1rem;'>RentMaster Global</h2>", unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align: center; margin-bottom: 1rem;'>RentMaster-GH</h2>", unsafe_allow_html=True)
 
             tab1, tab2 = st.tabs(["🔒 Log In", "📝 Sign Up"])
             redirect_url = "https://www.rentmastergh.com"
@@ -404,7 +404,7 @@ if "user" not in st.session_state:
     st.session_state.user = None
 
 if "app_currency" not in st.session_state:
-    st.session_state.app_currency = "USD"
+    st.session_state.app_currency = "GHS"
 
 if "code" in st.query_params:
     try:
@@ -436,8 +436,8 @@ if st.session_state.user is None:
 def header():
     st.markdown("""
     <div class="main-header">
-        <h1>RentMaster Global</h1>
-        <p>Worldwide Rental Property Management System &middot; Version 2.5</p>
+        <h1>RentMaster-GH</h1>
+        <p>Rental Property Management System &middot; Version 2.5</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -672,13 +672,13 @@ def generate_receipt_html(tenant: dict, payment: dict, property_obj: dict = None
     p_date = fmt_date(payment.get("payment_date"))
     p_ref = payment.get("notes") or payment.get("id", "N/A")
     t_name = tenant.get("name", "Valued Tenant")
-    p_name = prop_label(property_obj) if property_obj else "RentMaster Global Property"
+    p_name = prop_label(property_obj) if property_obj else "RentMaster-GH Property"
 
     receipt_html = f"""
     <div style="border: 2px solid #0f4c75; padding: 25px; border-radius: 12px; background-color: #ffffff; color: #1e293b; max-width: 600px; margin: 0 auto; font-family: sans-serif;">
         <div style="text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px;">
-            <h2 style="color: #0f4c75; margin: 0;">RentMaster Global Receipt</h2>
-            <p style="color: #64748b; margin: 5px 0 0 0; font-size: 0.9rem;">Official Proof of Rent Payment</p>
+            <h2 style="color: #0f4c75; margin: 0;">RentMaster-GH Official Receipt</h2>
+            <p style="color: #64748b; margin: 5px 0 0 0; font-size: 0.9rem;">Proof of Rent Payment</p>
         </div>
         <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
             <tr>
@@ -707,7 +707,7 @@ def generate_receipt_html(tenant: dict, payment: dict, property_obj: dict = None
             </tr>
         </table>
         <div style="text-align: center; margin-top: 25px; color: #94a3b8; font-size: 0.8rem;">
-            Thank you for your payment! Powered by RentMaster Global.
+            Thank you for your payment! Powered by RentMaster-GH.
         </div>
     </div>
     """
@@ -763,7 +763,7 @@ def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float,
 
 def page_dashboard():
     header()
-    st.subheader("Global Portfolio Overview")
+    st.subheader("Dashboard Overview")
 
     props = fetch_properties()
     tenants = fetch_tenants()
@@ -899,7 +899,7 @@ def page_properties():
 
 def page_landlords():
     header()
-    st.subheader("Landlord & Global Payout Setup")
+    st.subheader("Landlord & Payout Management")
     st.caption("Configure payout destinations (Mobile Money, Local Bank, or SWIFT/IBAN) for automated Paystack rent splits.")
 
     landlords = fetch_landlords()
@@ -930,7 +930,7 @@ def page_landlords():
         with col1:
             name = st.text_input("Landlord Full Name *", value=default_name)
             email = st.text_input("Email Address", value=default_email)
-            phone = st.text_input("Phone Number *", value=default_phone, help="International format e.g. +1 555 0199 or +233 24XXXXXXX")
+            phone = st.text_input("Phone Number *", value=default_phone, help="Format e.g. 024XXXXXXX or +233XXXXXXX")
             country = st.selectbox("Landlord Country *", list(GLOBAL_PAYOUT_BANKS.keys()))
 
         with col2:
@@ -1013,7 +1013,7 @@ def page_tenants():
                 email = st.text_input("Email")
                 rent_amount = st.number_input(f"Agreed Monthly Rent ({curr_code})", min_value=0.0, value=0.0, step=50.0)
             with col2:
-                phone = st.text_input("Phone Number", help="e.g. +1 555-0199 or +233 24XXXXXXX")
+                phone = st.text_input("Phone Number", help="e.g. 024XXXXXXX or +233 24XXXXXXX")
                 prop_id = st.selectbox("Property", list(prop_options.keys()),
                                        format_func=lambda x: prop_options.get(x, "-"))
 
@@ -1077,7 +1077,7 @@ def page_tenants():
 
 def page_payments():
     header()
-    st.subheader("Global Rent Ledger & Payments Hub")
+    st.subheader("Rent Ledger & Payments Hub")
 
     curr_code = get_current_currency()
 
@@ -1157,7 +1157,7 @@ def page_payments():
             # --- Live Paystack Rent Checkout Box ---
             with st.container(border=True):
                 st.markdown("#### 💳 Pay Rent Online (Card / Mobile Money / Transfer)")
-                st.caption("Process live rent payments securely anywhere in the world.")
+                st.caption("Process live rent payments securely via Paystack.")
 
                 prop_obj = selected_tenant.get("properties") if selected_tenant else None
                 landlord_obj = prop_obj.get("landlords") if (prop_obj and isinstance(prop_obj, dict)) else None
@@ -1178,7 +1178,7 @@ def page_payments():
                         receipt_email = st.text_input("Receipt Email *", value=tenant_email, placeholder="tenant@example.com")
 
                     callback_domain = st.text_input("Callback Base URL", value="https://www.rentmastergh.com")
-                    proceed_pay = st.form_submit_button("💳 Proceed to Global Checkout", type="primary", use_container_width=True)
+                    proceed_pay = st.form_submit_button("💳 Proceed to Checkout", type="primary", use_container_width=True)
 
                     if proceed_pay:
                         if not receipt_email:
@@ -1202,7 +1202,7 @@ def page_payments():
                                     auth_url = res["data"]["authorization_url"]
                                     st.success("Checkout initialized! Click below to complete your payment.")
                                     st.link_button(
-                                        "👉 Click Here to Pay Now (Visa / Mastercard / MoMo)",
+                                        "👉 Click Here to Pay Now (Card / Mobile Money)",
                                         auth_url,
                                         type="primary",
                                         use_container_width=True
@@ -1470,13 +1470,13 @@ def page_settings():
     with st.container(border=True):
         col_info1, col_info2 = st.columns([3, 1])
         with col_info1:
-            st.markdown("### RentMaster Global Enterprise")
+            st.markdown("### RentMaster-GH Enterprise")
             st.markdown(
-                "A comprehensive global rental property management system tailored for tracking properties, "
-                "tenants, payments, lease agreements, and maintenance requests worldwide."
+                "A comprehensive rental property management system tailored for tracking properties, "
+                "tenants, payments, lease agreements, and maintenance requests."
             )
         with col_info2:
-            st.markdown("**Version:** `2.5.0 Global`")
+            st.markdown("**Version:** `2.5.0`")
             st.markdown("**Environment:** `Production`")
             st.markdown("**Database Status:** :green[Connected]")
 
@@ -1496,14 +1496,14 @@ def page_settings():
 
     st.markdown("---")
 
-    st.markdown("#### System Preferences & Multi-Currency Settings")
+    st.markdown("#### System Preferences & Currency Settings")
     with st.container(border=True):
         col_p1, col_p2 = st.columns(2)
         with col_p1:
             currency_options = list(SUPPORTED_CURRENCIES.keys())
             curr_index = currency_options.index(curr_code) if curr_code in currency_options else 0
             selected_currency = st.selectbox(
-                "Default Global Currency *",
+                "Default Currency *",
                 options=currency_options,
                 format_func=lambda x: SUPPORTED_CURRENCIES[x]["name"],
                 index=curr_index
@@ -1516,7 +1516,7 @@ def page_settings():
 
         if st.button("Save System Preferences", type="primary", key="save_prefs"):
             st.session_state.app_currency = selected_currency
-            st.toast(f"Preferences saved! Currency updated to {selected_currency}.", icon="✅")
+            st.toast(f"Preferences saved! Default currency set to {selected_currency}.", icon="✅")
             st.rerun()
 
     st.markdown("---")
@@ -1632,7 +1632,7 @@ def page_settings():
                 st.markdown("---")
                 st.info(f"Transaction Reference Generated: `{st.session_state.ad_checkout_ref}`")
                 st.link_button(
-                    "👉 Proceed to Pay Now (Visa / Mastercard)",
+                    "👉 Proceed to Pay Now (Card / Mobile Money)",
                     st.session_state.ad_checkout_url,
                     type="primary",
                     use_container_width=True
@@ -1709,7 +1709,7 @@ with st.sidebar:
             st.rerun()
 
     st.markdown("---")
-    st.caption("RentMaster Global v2.5 • Streamlit + Supabase")
+    st.caption("RentMaster-GH v2.5 • Streamlit + Supabase")
 
 # Execute active page
 PAGES[selection]()
