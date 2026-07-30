@@ -245,7 +245,7 @@ def verify_paystack_payment(reference: str):
         return {"status": False, "message": str(e)}
 
 
-def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: str, bank_name: str, account_number: str, bank_code: str, platform_fee_pct: float = 0.0):
+def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: str, bank_name: str, account_number: str, bank_code: str, platform_fee_pct: float = 0.0, id_card_url: str = None):
     if not sb:
         raise Exception("Database client not initialized.")
 
@@ -272,6 +272,9 @@ def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: s
         "bank_code": bank_code,
         "paystack_subaccount_code": subaccount_code,
     }
+
+    if id_card_url:
+        payload["id_card_url"] = id_card_url
 
     if landlord_id:
         res = sb.table("landlords").update(payload).eq("id", landlord_id).execute()
@@ -745,12 +748,16 @@ def generate_receipt_html(tenant: dict, payment: dict, property_obj: dict = None
 # =========================================================================
 # Identity Verification (KYC) Helpers
 # =========================================================================
-def upload_id_to_supabase(file_obj, tenant_identifier: str):
+def upload_id_to_supabase(file_obj, identifier: str, folder: str = "tenants"):
+    """
+    Uploads an ID image/PDF file to Supabase Storage Bucket 'id-documents'.
+    Supports folder targeting ('tenants' or 'landlords').
+    """
     if not sb: return None
     try:
         file_bytes = file_obj.getvalue()
         file_ext = file_obj.name.split(".")[-1] if hasattr(file_obj, "name") and "." in file_obj.name else "jpg"
-        file_path = f"tenants/{uuid.uuid4().hex[:8]}_{tenant_identifier}.{file_ext}"
+        file_path = f"{folder}/{uuid.uuid4().hex[:8]}_{identifier}.{file_ext}"
 
         bucket = sb.storage.from_("id-documents")
         bucket.upload(file_path, file_bytes, {"content-type": getattr(file_obj, "type", "image/jpeg"), "upsert": "true"})
@@ -762,12 +769,15 @@ def upload_id_to_supabase(file_obj, tenant_identifier: str):
         return None
 
 
-def render_id_verification_widget():
-    st.markdown("##### 🆔 Tenant Identity Verification (KYC)")
+def render_id_verification_widget(entity_type: str = "Tenant", key_prefix: str = "id_widget"):
+    """
+    Reusable Identity Verification Widget for both Tenants and Landlords.
+    """
+    st.markdown(f"##### 🆔 {entity_type} Identity Verification (KYC)")
     st.markdown(
-        """
+        f"""
         <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-            <h6 style="margin: 0 0 0.4rem 0; color: #0369a1; font-weight: 600;">📌 ID Verification & Compliance Guidelines</h6>
+            <h6 style="margin: 0 0 0.4rem 0; color: #0369a1; font-weight: 600;">📌 {entity_type} ID Verification Guidelines</h6>
             <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: #0c4a6e; line-height: 1.4;">
                 <li><b>Accepted IDs:</b> Ghana Card / National ID, Passport, Driver's License, Voter ID.</li>
                 <li><b>Quality Standard:</b> All 4 corners visible, no glare or blur. Text must be legible.</li>
@@ -782,25 +792,25 @@ def render_id_verification_widget():
         "Choose ID Capture Method",
         ["📁 Drag & Drop File Upload", "📷 Live Camera Capture"],
         horizontal=True,
-        key="id_capture_method"
+        key=f"{key_prefix}_capture_method"
     )
 
     uploaded_id_file = None
     if "Drag & Drop" in capture_method:
         uploaded_id_file = st.file_uploader(
-            "Drop ID document file here (PNG, JPG, JPEG, PDF)",
+            f"Drop {entity_type} ID document file here (PNG, JPG, JPEG, PDF)",
             type=["png", "jpg", "jpeg", "pdf"],
-            key="id_file_dropzone"
+            key=f"{key_prefix}_file_dropzone"
         )
     else:
-        uploaded_id_file = st.camera_input("Take photo of ID Card", key="id_camera_capture")
+        uploaded_id_file = st.camera_input(f"Take photo of {entity_type} ID Card", key=f"{key_prefix}_camera_capture")
 
     if uploaded_id_file:
         st.success("✅ Document captured successfully!")
         if hasattr(uploaded_id_file, "type") and "pdf" in str(uploaded_id_file.type):
             st.info("📄 PDF File Selected")
         else:
-            st.image(uploaded_id_file, caption="Captured ID Card Preview", width=320)
+            st.image(uploaded_id_file, caption=f"Captured {entity_type} ID Preview", width=320)
 
     return uploaded_id_file
 
@@ -1029,6 +1039,9 @@ def page_landlords():
             selected_bank_code = available_banks[bank_name]
             st.text_input("Bank Code", value=selected_bank_code, disabled=True)
 
+        # Landlord ID Verification (KYC) Component
+        landlord_id_file = render_id_verification_widget(entity_type="Landlord", key_prefix="landlord")
+
         submitted = st.form_submit_button("Save Landlord Payout Details", type="primary", use_container_width=True)
 
         if submitted:
@@ -1037,6 +1050,12 @@ def page_landlords():
             else:
                 target_id = selected_id if selected_id != "new" else None
                 try:
+                    # Upload Landlord ID if present
+                    id_card_url = None
+                    if landlord_id_file:
+                        with st.spinner("Uploading Landlord ID document to secure storage..."):
+                            id_card_url = upload_id_to_supabase(landlord_id_file, name, folder="landlords")
+
                     with st.spinner("Registering landlord with Paystack API..."):
                         data, code = save_landlord_bank_details(
                             landlord_id=target_id,
@@ -1046,7 +1065,8 @@ def page_landlords():
                             bank_name=bank_name,
                             account_number=account_number,
                             bank_code=selected_bank_code,
-                            platform_fee_pct=0.0
+                            platform_fee_pct=0.0,
+                            id_card_url=id_card_url
                         )
                     clear_cache()
                     st.success(f"✅ Landlord registered! Paystack Subaccount Code: `{code}`")
@@ -1066,6 +1086,8 @@ def page_landlords():
                         st.caption(f"Email: {l['email']}")
                     if l.get('phone'):
                         st.caption(f"Phone: {l['phone']}")
+                    if l.get('id_card_url'):
+                        st.markdown(f"🆔 [View Verified ID Document]({l['id_card_url']})")
                 with c2:
                     st.markdown(f"Provider: **{l.get('bank_name', '-')}**")
                     st.caption(f"Account: {l.get('account_number', '-')}")
@@ -1111,7 +1133,7 @@ def page_tenants():
 
             active = st.checkbox("Active Tenant", value=True)
 
-            id_file_data = render_id_verification_widget()
+            id_file_data = render_id_verification_widget(entity_type="Tenant", key_prefix="tenant")
 
             submitted = st.form_submit_button("Add Tenant", type="primary")
 
@@ -1124,7 +1146,7 @@ def page_tenants():
                     id_card_url = None
                     if id_file_data:
                         with st.spinner("Uploading ID document to secure storage..."):
-                            id_card_url = upload_id_to_supabase(id_file_data, name)
+                            id_card_url = upload_id_to_supabase(id_file_data, name, folder="tenants")
 
                     payload = {
                         "name": name,
