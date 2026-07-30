@@ -172,7 +172,91 @@ def fmt_date(v):
 
 
 # ---------------------------------------------------------------------------
-# Paystack API Helpers
+# Data Fetching & Caching Helpers (MUST BE DEFINED EARLY)
+# ---------------------------------------------------------------------------
+@st.cache_data(ttl=5)
+def fetch_properties():
+    if not sb: return []
+    try:
+        r = sb.table("properties").select("*").order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception: return []
+
+
+@st.cache_data(ttl=5)
+def fetch_landlords():
+    if not sb: return []
+    try:
+        r = sb.table("landlords").select("*").order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception: return []
+
+
+@st.cache_data(ttl=5)
+def fetch_tenants():
+    if not sb: return []
+    try:
+        r = sb.table("tenants").select("*, properties(*, landlords(*))").order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception:
+        try:
+            r = sb.table("tenants").select("*, properties(*)").order("created_at", desc=True).execute()
+            return r.data or []
+        except Exception: return []
+
+
+@st.cache_data(ttl=5)
+def fetch_payments():
+    if not sb: return []
+    try:
+        r = sb.table("payments").select("*, tenants(*)").order("payment_date", desc=True).execute()
+        return r.data or []
+    except Exception: return []
+
+
+@st.cache_data(ttl=5)
+def fetch_leases():
+    if not sb: return []
+    try:
+        r = sb.table("leases").select("*, properties(*), tenants(*)").order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception:
+        try:
+            r = sb.table("leases").select("*, properties(*), tenants(*)").order("start_date", desc=True).execute()
+            return r.data or []
+        except Exception: return []
+
+
+@st.cache_data(ttl=5)
+def fetch_maintenance():
+    if not sb: return []
+    try:
+        r = sb.table("maintenance_requests").select("*, properties(*), tenants(*)").order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception: return []
+
+
+@st.cache_data(ttl=5)
+def fetch_ads():
+    if not sb: return []
+    try:
+        r = sb.table("ads").select("*").order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception: return []
+
+
+def clear_cache():
+    fetch_properties.clear()
+    fetch_landlords.clear()
+    fetch_tenants.clear()
+    fetch_payments.clear()
+    fetch_leases.clear()
+    fetch_maintenance.clear()
+    fetch_ads.clear()
+
+
+# ---------------------------------------------------------------------------
+# Paystack API & Payment Helpers
 # ---------------------------------------------------------------------------
 def create_paystack_subaccount(business_name: str, bank_code: str, account_number: str, percentage_charge: float = 0.0, email: str = None, phone: str = None):
     if not PAYSTACK_SECRET_KEY:
@@ -321,7 +405,7 @@ st.markdown("""
 
 
 # =========================================================================
-# 1 & 2: LOGIN PAGE WITH "REMEMBER ME" TICKBOX AND PAID ADVERTISEMENTS
+# LOGIN PAGE WITH "REMEMBER ME" AND PAID ADVERTISEMENTS
 # =========================================================================
 def auth_page():
     st.markdown("<br>", unsafe_allow_html=True)
@@ -414,7 +498,11 @@ def auth_page():
             st.markdown("### 📢 Sponsored Advertisements")
             st.caption("Promotional offers & featured service partners")
 
-            ads = fetch_ads()
+            try:
+                ads = fetch_ads()
+            except Exception:
+                ads = []
+
             active_ads = [ad for ad in ads if ad.get("status") in ("paid", "active")] if ads else []
 
             if active_ads:
@@ -530,7 +618,7 @@ if st.session_state.user is None:
 
 
 # ---------------------------------------------------------------------------
-# Reusable UI Helpers & Data Helpers
+# UI Helpers
 # ---------------------------------------------------------------------------
 def header():
     st.markdown("""
@@ -571,87 +659,6 @@ def show_support_dialog():
                     st.success("✅ Your request has been submitted. Thank you!")
                 except Exception as e:
                     st.error(f"Failed to submit request: {e}")
-
-
-@st.cache_data(ttl=5)
-def fetch_properties():
-    if not sb: return []
-    try:
-        r = sb.table("properties").select("*").order("created_at", desc=True).execute()
-        return r.data or []
-    except Exception: return []
-
-
-@st.cache_data(ttl=5)
-def fetch_landlords():
-    if not sb: return []
-    try:
-        r = sb.table("landlords").select("*").order("created_at", desc=True).execute()
-        return r.data or []
-    except Exception: return []
-
-
-@st.cache_data(ttl=5)
-def fetch_tenants():
-    if not sb: return []
-    try:
-        r = sb.table("tenants").select("*, properties(*, landlords(*))").order("created_at", desc=True).execute()
-        return r.data or []
-    except Exception:
-        try:
-            r = sb.table("tenants").select("*, properties(*)").order("created_at", desc=True).execute()
-            return r.data or []
-        except Exception: return []
-
-
-@st.cache_data(ttl=5)
-def fetch_payments():
-    if not sb: return []
-    try:
-        r = sb.table("payments").select("*, tenants(*)").order("payment_date", desc=True).execute()
-        return r.data or []
-    except Exception: return []
-
-
-@st.cache_data(ttl=5)
-def fetch_leases():
-    if not sb: return []
-    try:
-        r = sb.table("leases").select("*, properties(*), tenants(*)").order("created_at", desc=True).execute()
-        return r.data or []
-    except Exception:
-        try:
-            r = sb.table("leases").select("*, properties(*), tenants(*)").order("start_date", desc=True).execute()
-            return r.data or []
-        except Exception: return []
-
-
-@st.cache_data(ttl=5)
-def fetch_maintenance():
-    if not sb: return []
-    try:
-        r = sb.table("maintenance_requests").select("*, properties(*), tenants(*)").order("created_at", desc=True).execute()
-        return r.data or []
-    except Exception: return []
-
-
-@st.cache_data(ttl=5)
-def fetch_ads():
-    if not sb: return []
-    try:
-        r = sb.table("ads").select("*").order("created_at", desc=True).execute()
-        return r.data or []
-    except Exception: return []
-
-
-def clear_cache():
-    fetch_properties.clear()
-    fetch_landlords.clear()
-    fetch_tenants.clear()
-    fetch_payments.clear()
-    fetch_leases.clear()
-    fetch_maintenance.clear()
-    fetch_ads.clear()
 
 
 def prop_label(p):
@@ -883,7 +890,7 @@ def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float,
 
 
 # =========================================================================
-# 3: USER PROFILE WITH ALL 5 REQUIRED SECTIONS
+# USER PROFILE PAGE
 # =========================================================================
 def page_user_profile():
     header()
@@ -901,9 +908,6 @@ def page_user_profile():
         "5. Security Settings"
     ])
 
-    # -------------------------------------------------------------------
-    # SECTION 1: Account Details
-    # -------------------------------------------------------------------
     with profile_tab1:
         st.markdown("#### 📄 Account Details")
         st.caption("View and manage your core user profile information.")
@@ -925,9 +929,6 @@ def page_user_profile():
                 st.session_state.profile_phone = phone
                 st.toast("✅ Account details saved successfully!", icon="👤")
 
-    # -------------------------------------------------------------------
-    # SECTION 2: User Management
-    # -------------------------------------------------------------------
     with profile_tab2:
         st.markdown("#### 👥 User Management")
         st.caption("Manage platform users, property managers, tenants, and staff roles.")
@@ -964,9 +965,6 @@ def page_user_profile():
 
         st.dataframe(user_table_data, use_container_width=True, hide_index=True)
 
-    # -------------------------------------------------------------------
-    # SECTION 3: Account Security
-    # -------------------------------------------------------------------
     with profile_tab3:
         st.markdown("#### 🛡️ Account Security")
         st.caption("Review active sessions, multi-factor authentication, and login safety.")
@@ -986,9 +984,6 @@ def page_user_profile():
             if st.button("Revoke All Other Sessions", type="secondary"):
                 st.success("✅ All other active sessions have been revoked.")
 
-    # -------------------------------------------------------------------
-    # SECTION 4: Change Password
-    # -------------------------------------------------------------------
     with profile_tab4:
         st.markdown("#### 🔑 Change Password")
         st.caption("Update your password securely via Supabase Auth.")
@@ -1016,9 +1011,6 @@ def page_user_profile():
                     except Exception as e:
                         st.error(f"Failed to update password: {e}")
 
-    # -------------------------------------------------------------------
-    # SECTION 5: Security Settings
-    # -------------------------------------------------------------------
     with profile_tab5:
         st.markdown("#### ⚙️ Security Settings")
         st.caption("Configure notification rules, session timeouts, and privacy settings.")
