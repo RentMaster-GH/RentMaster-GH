@@ -147,9 +147,6 @@ def fmt_date(v):
 # Paystack API Helpers (Multi-Currency & Global Direct Payouts)
 # ---------------------------------------------------------------------------
 def create_paystack_subaccount(business_name: str, bank_code: str, account_number: str, percentage_charge: float = 0.0, email: str = None, phone: str = None):
-    """
-    Registers a landlord as a subaccount on Paystack.
-    """
     if not PAYSTACK_SECRET_KEY:
         return {"status": False, "message": "PAYSTACK_SECRET_KEY is missing."}
 
@@ -176,10 +173,6 @@ def create_paystack_subaccount(business_name: str, bank_code: str, account_numbe
 
 
 def initialize_paystack_payment(email: str, amount_in_main_unit: float, callback_url: str, metadata: dict = None, subaccount: str = None, currency: str = None):
-    """
-    Initializes a global payment with Paystack API.
-    Supports multi-currency checkout (GHS, USD, EUR, GBP, NGN, KES, ZAR).
-    """
     if not PAYSTACK_SECRET_KEY:
         return {"status": False, "message": "PAYSTACK_SECRET_KEY is not configured in secrets or environment."}
 
@@ -210,9 +203,6 @@ def initialize_paystack_payment(email: str, amount_in_main_unit: float, callback
 
 
 def verify_paystack_payment(reference: str):
-    """
-    Verifies transaction status directly with Paystack API.
-    """
     if not PAYSTACK_SECRET_KEY:
         return {"status": False, "message": "PAYSTACK_SECRET_KEY is missing."}
 
@@ -228,10 +218,6 @@ def verify_paystack_payment(reference: str):
 
 
 def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: str, bank_name: str, account_number: str, bank_code: str, platform_fee_pct: float = 0.0):
-    """
-    1. Calls Paystack API to create subaccount.
-    2. Saves landlord info and subaccount_code to Supabase.
-    """
     ps_res = create_paystack_subaccount(
         business_name=name,
         bank_code=bank_code,
@@ -269,7 +255,6 @@ def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: s
 # ---------------------------------------------------------------------------
 st.markdown("""
 <style>
-    /* Header Gradient Banner */
     .main-header {
         background: linear-gradient(135deg, #0f4c75 0%, #3282b8 100%);
         padding: 1.5rem 2rem;
@@ -302,33 +287,9 @@ def auth_page():
         with st.container(border=True):
             st.markdown(
                 """
-                <div style="
-                    background-color: #f0fdf4; 
-                    border: 1px solid #bbf7d0; 
-                    border-radius: 8px; 
-                    padding: 0.9rem; 
-                    margin-bottom: 1rem; 
-                    text-align: center;
-                ">
-                    <p style="margin: 0 0 0.4rem 0; font-weight: 600; color: #166534; font-size: 0.88rem;">
-                        Looking to make a payment or support without logging in?
-                    </p>
-                    <a href="https://paystack.shop/pay/zvx0npq7hv" 
-                       target="_blank" 
-                       rel="noopener noreferrer" 
-                       style="
-                           display: inline-block; 
-                           background-color: #09a5db; 
-                           color: #ffffff; 
-                           font-weight: 600; 
-                           padding: 8px 16px; 
-                           border-radius: 6px; 
-                           text-decoration: none;
-                           font-size: 0.88rem;
-                           box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-                       ">
-                        💙 Make a Payment / Donation via Paystack
-                    </a>
+                <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.9rem; margin-bottom: 1rem; text-align: center;">
+                    <p style="margin: 0 0 0.4rem 0; font-weight: 600; color: #166534; font-size: 0.88rem;">Looking to make a payment or support without logging in?</p>
+                    <a href="https://paystack.shop/pay/zvx0npq7hv" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #09a5db; color: #ffffff; font-weight: 600; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 0.88rem;">💙 Make a Payment / Donation via Paystack</a>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -362,14 +323,8 @@ def auth_page():
                     if res.url:
                         st.markdown(
                             f"""
-                            <a href="{res.url}" target="_self" style="
-                                display: flex; align-items: center; justify-content: center; gap: 10px;
-                                width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 6px;
-                                background-color: white; color: #3c4043; font-weight: 500; text-decoration: none;
-                                box-sizing: border-box; font-size: 0.9rem;
-                            ">
-                                <img src="https://www.gstatic.com/images/branding/product/1x/gsa_64dp.png" width="18" height="18">
-                                Continue with Google
+                            <a href="{res.url}" target="_self" style="display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; background-color: white; color: #3c4043; font-weight: 500; text-decoration: none; box-sizing: border-box; font-size: 0.9rem;">
+                                <img src="https://www.gstatic.com/images/branding/product/1x/gsa_64dp.png" width="18" height="18"> Continue with Google
                             </a>
                             """,
                             unsafe_allow_html=True
@@ -434,9 +389,6 @@ if st.session_state.user is None:
 # Global Paystack Payment Callback Verification Handler
 # ---------------------------------------------------------------------------
 def handle_paystack_callbacks():
-    """
-    Verifies any returned Paystack transaction (Rent or Advert) globally upon page reload.
-    """
     query_params = st.query_params
     ref_param = query_params.get("reference") or query_params.get("trxref")
 
@@ -445,7 +397,6 @@ def handle_paystack_callbacks():
 
     reference = str(ref_param)
 
-    # 1. Advert Placement Verification
     if reference.startswith("AD-"):
         with st.spinner("Verifying Advert Payment..."):
             verification = verify_paystack_payment(reference)
@@ -459,8 +410,6 @@ def handle_paystack_callbacks():
             else:
                 st.error("❌ Advert payment verification failed or was cancelled.")
         st.query_params.clear()
-
-    # 2. Tenant Rent Payment Verification
     else:
         with st.spinner("Verifying Paystack Rent Payment status..."):
             verification = verify_paystack_payment(reference)
@@ -487,7 +436,6 @@ def handle_paystack_callbacks():
         st.query_params.clear()
 
 
-# Trigger callback handler globally
 handle_paystack_callbacks()
 
 
@@ -510,10 +458,7 @@ def show_support_dialog():
     with st.form("support_form", clear_on_submit=True):
         category = st.selectbox("Category *", ["Complaint", "Suggestion", "Bug Report", "General Query"])
         subject = st.text_input("Subject *")
-        message = st.text_area(
-            "Details / Message *",
-            help="Please describe your suggestion or complaint in detail.",
-        )
+        message = st.text_area("Details / Message *", help="Please describe your suggestion or complaint in detail.")
 
         submitted = st.form_submit_button("Submit Request", type="primary", use_container_width=True)
 
@@ -638,23 +583,20 @@ def clear_cache():
 
 
 def prop_label(p):
-    if not p:
+    if not isinstance(p, dict):
         return "-"
     p_name = p.get('name') or p.get('property_name', 'Unnamed')
     return f"{p_name} - {p.get('address', '')}"
 
 
 def tenant_label(t):
-    if not t:
+    if not isinstance(t, dict):
         return "-"
     return t.get("name", "Unnamed")
 
 
 def compute_tenant_ledger(tenant: dict, all_payments: list):
-    """
-    Computes tenant statement metrics and line items.
-    """
-    if not tenant:
+    if not isinstance(tenant, dict):
         return {"monthly_rent": 0.0, "total_charged": 0.0, "total_paid": 0.0, "balance": 0.0, "statement": [], "tenant_payments": []}
 
     monthly_rent = float(tenant.get("rent_amount") or 0.0)
@@ -693,7 +635,7 @@ def compute_tenant_ledger(tenant: dict, all_payments: list):
         total_charged = monthly_rent
 
     tenant_id = tenant.get("id")
-    tenant_payments = [p for p in all_payments if p.get("tenant_id") == tenant_id and p.get("status") == "paid"]
+    tenant_payments = [p for p in all_payments if isinstance(p, dict) and p.get("tenant_id") == tenant_id and p.get("status") == "paid"]
     total_paid = sum(float(p.get("amount") or 0.0) for p in tenant_payments)
 
     for p in tenant_payments:
@@ -727,8 +669,12 @@ def compute_tenant_ledger(tenant: dict, all_payments: list):
 
 def generate_receipt_html(tenant: dict, payment: dict, property_obj: dict = None):
     """
-    Generates a formal HTML Rent Payment Receipt.
+    Defensive receipt generator to prevent deploy/runtime crashes.
     """
+    tenant = tenant if isinstance(tenant, dict) else {}
+    payment = payment if isinstance(payment, dict) else {}
+    property_obj = property_obj if isinstance(property_obj, dict) else {}
+
     amount_str = fmt_money(payment.get("amount", 0))
     p_date = fmt_date(payment.get("payment_date"))
     p_ref = payment.get("notes") or payment.get("id", "N/A")
@@ -760,7 +706,7 @@ def generate_receipt_html(tenant: dict, payment: dict, property_obj: dict = None
             </tr>
             <tr>
                 <td style="padding: 8px 0; color: #64748b;">Payment Method:</td>
-                <td style="padding: 8px 0; text-align: right; font-weight: bold;">{(payment.get('payment_method') or 'Paystack').replace('_', ' ').title()}</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: bold;">{str(payment.get('payment_method') or 'Paystack').replace('_', ' ').title()}</td>
             </tr>
             <tr style="border-top: 2px solid #e2e8f0; border-bottom: 2px solid #e2e8f0;">
                 <td style="padding: 15px 0; font-size: 1.1rem; font-weight: bold; color: #0f4c75;">Amount Paid:</td>
@@ -774,14 +720,11 @@ def generate_receipt_html(tenant: dict, payment: dict, property_obj: dict = None
     """
     return receipt_html
 
+
 # =========================================================================
 # Identity Verification (KYC) Helpers
 # =========================================================================
 def upload_id_to_supabase(file_obj, tenant_identifier: str):
-    """
-    Uploads an ID image/PDF file to Supabase Storage Bucket 'id-documents'.
-    Returns the public file URL.
-    """
     try:
         file_bytes = file_obj.getvalue()
         file_ext = file_obj.name.split(".")[-1] if hasattr(file_obj, "name") and "." in file_obj.name else "jpg"
@@ -798,9 +741,6 @@ def upload_id_to_supabase(file_obj, tenant_identifier: str):
 
 
 def render_id_verification_widget():
-    """
-    Renders the ID Verification UI widget with guidelines, dropzone, camera, and preview.
-    """
     st.markdown("##### 🆔 Tenant Identity Verification (KYC)")
     st.markdown(
         """
@@ -842,15 +782,11 @@ def render_id_verification_widget():
 
     return uploaded_id_file
 
+
 # ---------------------------------------------------------------------------
 # Ad Management Helpers
 # ---------------------------------------------------------------------------
 def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float, start_date: str, end_date: str, destination_url: str, creative_url: str, email: str, callback_url: str, user_id: str = None):
-    """
-    1. Generates a unique transaction reference.
-    2. Saves the ad record to Supabase with status = 'pending_payment'.
-    3. Initializes Paystack payment and returns the payment authorization URL.
-    """
     reference = f"AD-{uuid.uuid4().hex[:10].upper()}"
 
     ad_payload = {
@@ -865,10 +801,8 @@ def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float,
         "reference": reference,
     }
 
-    # 1. Insert into Supabase 'ads' table
     sb.table("ads").insert(ad_payload).execute()
 
-    # 2. Call Paystack API
     paystack_res = initialize_paystack_payment(
         email=email,
         amount_in_main_unit=amount_ghs,
@@ -1153,7 +1087,6 @@ def page_tenants():
 
             active = st.checkbox("Active Tenant", value=True)
 
-            # Identity Verification (KYC) Component
             id_file_data = render_id_verification_widget()
 
             submitted = st.form_submit_button("Add Tenant", type="primary")
@@ -1221,7 +1154,6 @@ def page_payments():
     st.subheader("Rent Ledger & Payments Hub")
 
     curr_code = get_current_currency()
-
     tenants = fetch_tenants()
     all_payments = fetch_payments()
 
@@ -1231,9 +1163,7 @@ def page_payments():
         "📊 Master Payment Log & Receipts"
     ])
 
-    # =========================================================================
     # TAB 1: TENANT RENT LEDGER & LIVE PAYSTACK RENT CHECKOUT
-    # =========================================================================
     with tab_ledger:
         if not tenants:
             st.info("No active tenants found. Add a tenant to view their rent ledger.")
@@ -1249,7 +1179,6 @@ def page_payments():
             selected_tenant = next((t for t in tenants if t["id"] == selected_tenant_id), None)
             ledger = compute_tenant_ledger(selected_tenant, all_payments)
 
-            # Metric Summary Bar
             st.markdown("---")
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("Agreed Monthly Rent", fmt_money(ledger["monthly_rent"]))
@@ -1262,7 +1191,6 @@ def page_payments():
 
             st.markdown("---")
 
-            # --- Live Paystack Rent Checkout Box ---
             with st.container(border=True):
                 st.markdown("#### 💳 Pay Rent Online (Card / Mobile Money / Transfer)")
                 st.caption("Process live rent payments securely via Paystack.")
@@ -1318,7 +1246,6 @@ def page_payments():
                                 else:
                                     st.error(f"Failed to initialize payment: {res.get('message', 'Unknown error')}")
 
-            # --- Itemized Statement of Account Table ---
             st.markdown("#### 📋 Itemized Rent Ledger Statement")
 
             if not ledger["statement"]:
@@ -1338,9 +1265,7 @@ def page_payments():
                     })
                 st.dataframe(formatted_statement, use_container_width=True, hide_index=True)
 
-    # =========================================================================
-    # TAB 2: MANUAL / OFFLINE PAYMENT RECORDING
-    # =========================================================================
+    # TAB 2: MANUAL PAYMENT RECORDING
     with tab_manual:
         st.markdown("##### 📝 Record Offline Payment (Cash, Check, Bank Deposit)")
 
@@ -1376,9 +1301,7 @@ def page_payments():
                     st.success("✅ Payment recorded into ledger successfully.")
                     st.rerun()
 
-    # =========================================================================
-    # TAB 3: MASTER LOG & DIGITAL RECEIPT GENERATOR
-    # =========================================================================
+    # TAB 3: TRANSACTION LOG & RECEIPTS
     with tab_log:
         st.markdown("##### 📊 Transaction Log & Digital Receipts")
 
@@ -1606,4 +1529,201 @@ def page_settings():
             st.selectbox("Records Per Page Display", [10, 25, 50, 100], index=1)
             st.toggle("Enable Automated Payment Alerts", value=True)
 
-        if st.button("
+        if st.button("Save System Preferences", type="primary", key="save_prefs"):
+            st.session_state.app_currency = selected_currency
+            st.toast(f"Preferences saved! Default currency set to {selected_currency}.", icon="✅")
+            st.rerun()
+
+    st.markdown("---")
+
+    st.markdown("#### Paid Advertisements & Ad Space Management")
+    st.caption("Manage sponsor banners, advertiser campaigns, and paid placements across tenant/landlord portals.")
+
+    with st.container(border=True):
+        tab_active_ads, tab_new_ad, tab_ad_analytics = st.tabs([
+            "📢 Active Ad Placements",
+            "💳 Create & Pay for Advert",
+            "📊 Monetization & Analytics"
+        ])
+
+        with tab_active_ads:
+            st.markdown("##### Current Banner Placements")
+            ads_list = fetch_ads()
+            if not ads_list:
+                st.info("No advertisement campaigns found in database.")
+            else:
+                for ad in ads_list:
+                    with st.container(border=True):
+                        col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+                        with col1:
+                            st.markdown(f"**{ad.get('business_name', 'Unnamed Business')}**")
+                            st.caption(f"Slot: {ad.get('ad_slot')}")
+                            if ad.get("destination_url"):
+                                st.caption(f"URL: [{ad.get('destination_url')}]({ad.get('destination_url')})")
+                        with col2:
+                            st.markdown(f"Rate: **{fmt_money(ad.get('monthly_rate'))}**")
+                            st.caption(f"Ref: `{ad.get('reference', 'N/A')}`")
+                        with col3:
+                            st.caption(f"Schedule: {fmt_date(ad.get('start_date'))} to {fmt_date(ad.get('end_date'))}")
+                            badge_color = "green" if ad.get('status') in ('paid', 'active') else "orange"
+                            st.markdown(f"Status: :{badge_color}[**{str(ad.get('status')).upper()}**]")
+                        with col4:
+                            if st.button("Delete", key=f"del_ad_{ad['id']}", type="secondary"):
+                                sb.table("ads").delete().eq("id", ad["id"]).execute()
+                                clear_cache()
+                                st.rerun()
+
+        with tab_new_ad:
+            st.markdown("##### Add Sponsored Campaign")
+
+            if "ad_checkout_url" not in st.session_state:
+                st.session_state.ad_checkout_url = None
+            if "ad_checkout_ref" not in st.session_state:
+                st.session_state.ad_checkout_ref = None
+
+            with st.form("new_advert_form", clear_on_submit=False):
+                f1, f2 = st.columns(2)
+                with f1:
+                    client_name = st.text_input("Advertiser / Business Name *", placeholder="e.g. Absa Bank")
+                    advertiser_email = st.text_input("Receipt / Contact Email *", value=user_email if user_email != "Active Session" else "")
+                    ad_position = st.selectbox("Target Ad Slot *", [
+                        "Top Header Leaderboard (728x90)",
+                        "Sidebar Banner (300x250)",
+                        "Footer Promotional Bar (Full Width)",
+                        "In-Feed Property Listing Sponsor"
+                    ])
+                    start_date = st.date_input("Campaign Start Date", value=date.today())
+
+                with f2:
+                    target_url = st.text_input("Destination URL *", placeholder="https://example.com")
+                    creative_url = st.text_input("Banner Image URL *", placeholder="https://example.com/banner.png")
+                    pricing_rate = st.number_input(f"Monthly Slot Rate ({curr_code}) *", min_value=10.0, value=500.0, step=50.0)
+                    end_date = st.date_input("Campaign End Date", value=date.today() + timedelta(days=30))
+
+                callback_url = st.text_input("Callback Base URL", value="https://www.rentmastergh.com")
+
+                campaign_days = (end_date - start_date).days
+                daily_rate = pricing_rate / 30.0
+                total_campaign_cost = daily_rate * max(1, campaign_days)
+
+                st.info(f"📅 **Duration:** {max(1, campaign_days)} days | **Prorated Total Charge:** {fmt_money(total_campaign_cost)}")
+
+                submit_ad = st.form_submit_button("💳 Pay Now & Launch Campaign", type="primary", use_container_width=True)
+
+                if submit_ad:
+                    if not client_name or not advertiser_email or not target_url or not creative_url:
+                        st.error("Please fill in all required fields marked with *.")
+                    elif end_date < start_date:
+                        st.error("End date cannot be earlier than start date.")
+                    else:
+                        with st.spinner("Saving campaign & initializing checkout..."):
+                            try:
+                                active_user_id = user_id if user_id != "N/A" else None
+                                ps_res, ref = initialize_ad_payment(
+                                    client_name=client_name,
+                                    ad_position=ad_position,
+                                    amount_ghs=total_campaign_cost,
+                                    start_date=str(start_date),
+                                    end_date=str(end_date),
+                                    destination_url=target_url,
+                                    creative_url=creative_url,
+                                    email=advertiser_email,
+                                    callback_url=callback_url,
+                                    user_id=active_user_id
+                                )
+
+                                if ps_res.get("status"):
+                                    st.session_state.ad_checkout_url = ps_res["data"]["authorization_url"]
+                                    st.session_state.ad_checkout_ref = ref
+                                    clear_cache()
+                                    st.success("Advert created! Click the Pay button below to complete payment.")
+                                else:
+                                    st.error(f"Paystack Initialization Failed: {ps_res.get('message')}")
+                            except Exception as e:
+                                st.error(f"Error processing advert checkout: {e}")
+
+            if st.session_state.ad_checkout_url:
+                st.markdown("---")
+                st.info(f"Transaction Reference Generated: `{st.session_state.ad_checkout_ref}`")
+                st.link_button(
+                    "👉 Proceed to Pay Now (Card / Mobile Money)",
+                    st.session_state.ad_checkout_url,
+                    type="primary",
+                    use_container_width=True
+                )
+
+        with tab_ad_analytics:
+            st.markdown("##### Ad Revenue & Impression Performance")
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Monthly Ad Revenue", fmt_money(3500.0), "+12%")
+            m2.metric("Total Ad Impressions", "48,210", "+1,240 this week")
+            m3.metric("Avg. Click-Through Rate (CTR)", "3.4%", "+0.5%")
+
+    st.markdown("---")
+
+    st.markdown("#### Data Management & Backup Export")
+    st.caption("Export application database tables into JSON format for external auditing or data backup.")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.download_button(
+            "📥 Export Properties",
+            data=json.dumps(fetch_properties(), indent=2),
+            file_name="rentmaster_properties.json",
+            mime="application/json",
+            use_container_width=True
+        )
+    with col2:
+        st.download_button(
+            "📥 Export Payments",
+            data=json.dumps(fetch_payments(), indent=2),
+            file_name="rentmaster_payments.json",
+            mime="application/json",
+            use_container_width=True
+        )
+    with col3:
+        st.download_button(
+            "📥 Export Tenants",
+            data=json.dumps(fetch_tenants(), indent=2),
+            file_name="rentmaster_tenants.json",
+            mime="application/json",
+            use_container_width=True
+        )
+
+
+# ---------------------------------------------------------------------------
+# Sidebar Navigation & Execution Router
+# ---------------------------------------------------------------------------
+PAGES = {
+    "Dashboard": page_dashboard,
+    "Properties": page_properties,
+    "Landlords": page_landlords,
+    "Tenants": page_tenants,
+    "Payments": page_payments,
+    "Leases": page_leases,
+    "Maintenance": page_maintenance,
+    "Settings": page_settings,
+}
+
+with st.sidebar:
+    st.markdown("### Navigation")
+    selection = st.radio("Go to", list(PAGES.keys()))
+
+    st.markdown("---")
+    if st.button("💬 Support & Suggestions", use_container_width=True):
+        show_support_dialog()
+
+    st.markdown("---")
+    if st.session_state.user:
+        user_email = getattr(st.session_state.user, "email", "User")
+        st.write(f"👤 Logged in: **{user_email}**")
+        if st.button("Logout", key="logout_btn"):
+            sb.auth.sign_out()
+            st.session_state.clear()
+            st.rerun()
+
+    st.markdown("---")
+    st.caption("RentMaster-GH v2.5 • Streamlit + Supabase")
+
+# Execute active page
+PAGES[selection]()
