@@ -404,7 +404,7 @@ def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float,
 
 # ---------------------------------------------------------------------------
 # REUSABLE PAID ADVERTISEMENTS & AD SPACE MANAGEMENT COMPONENT
-# Used on both the Login Page and the Settings Page
+# (Active Placements + Create & Pay for Advert)
 # ---------------------------------------------------------------------------
 def render_ad_space_management(key_prefix: str = "ad"):
     st.markdown("#### Paid Advertisements & Ad Space Management")
@@ -416,10 +416,9 @@ def render_ad_space_management(key_prefix: str = "ad"):
     user_id = getattr(user, "id", None) if user else None
 
     with st.container(border=True):
-        tab_active_ads, tab_new_ad, tab_ad_analytics = st.tabs([
+        tab_active_ads, tab_new_ad = st.tabs([
             "📢 Active Ad Placements",
-            "💳 Create & Pay for Advert",
-            "📊 Monetization & Analytics"
+            "💳 Create & Pay for Advert"
         ])
 
         with tab_active_ads:
@@ -537,13 +536,6 @@ def render_ad_space_management(key_prefix: str = "ad"):
                     use_container_width=True
                 )
 
-        with tab_ad_analytics:
-            st.markdown("##### Ad Revenue & Impression Performance")
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Monthly Ad Revenue", fmt_money(3500.0), "+12%")
-            m2.metric("Total Ad Impressions", "48,210", "+1,240 this week")
-            m3.metric("Avg. Click-Through Rate (CTR)", "3.4%", "+0.5%")
-
 
 # ---------------------------------------------------------------------------
 # Custom CSS Styling
@@ -582,7 +574,7 @@ st.markdown("""
 
 
 # =========================================================================
-# LOGIN PAGE WITH "REMEMBER ME" AND FULL AD SPACE MANAGEMENT
+# LOGIN PAGE WITH "REMEMBER ME" AND AD SPACE MANAGEMENT
 # =========================================================================
 def auth_page():
     st.markdown("<br>", unsafe_allow_html=True)
@@ -669,7 +661,7 @@ def auth_page():
                         except Exception as e:
                             st.error(f"Error: {e}")
 
-    # PAID ADVERTISEMENTS AND AD SPACE MANAGEMENT SECTION ON LOGIN PAGE (SAME AS SETTINGS PAGE)
+    # PAID ADVERTISEMENTS AND AD SPACE MANAGEMENT SECTION ON LOGIN PAGE
     with ad_col:
         render_ad_space_management(key_prefix="login_ad")
 
@@ -1869,7 +1861,7 @@ def page_settings():
 
     st.markdown("---")
 
-    # PAID ADVERTISEMENTS AND AD SPACE MANAGEMENT SECTION ON SETTINGS PAGE (REUSABLE COMPONENT)
+    # PAID ADVERTISEMENTS AND AD SPACE MANAGEMENT SECTION ON SETTINGS PAGE
     render_ad_space_management(key_prefix="settings_ad")
 
     st.markdown("---")
