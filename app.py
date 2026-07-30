@@ -11,6 +11,7 @@ import uuid
 from datetime import date, timedelta
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from supabase import create_client
 from streamlit.errors import StreamlitSecretNotFoundError
@@ -27,6 +28,27 @@ st.set_page_config(
 
 # Load environment variables
 load_dotenv()
+
+
+def inject_google_analytics(measurement_id="G-EFD2P6FKM5"):
+    """
+    Injects Google Analytics 4 tracking snippet.
+    """
+    ga_html = f"""
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id={measurement_id}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){{dataLayer.push(arguments);}}
+      gtag('js', new Date());
+      gtag('config', '{measurement_id}');
+    </script>
+    """
+    components.html(ga_html, height=0, width=0)
+
+
+# Inject Google Analytics (Called AFTER set_page_config)
+inject_google_analytics("G-EFD2P6FKM5")
 
 
 def get_secret(key: str, default: str = "") -> str:
@@ -379,33 +401,8 @@ if "app_currency" not in st.session_state:
 if not sb:
     st.warning("⚠️ Database credentials missing. Please set SUPABASE_URL and SUPABASE_KEY in environment variables.")
 
-if sb and "code" in st.query_params:
-    try:
-        auth_code = st.query_params["code"]
-        res = sb.auth.exchange_code_for_session({"auth_code": auth_code})
-        if res and res.user:
-            st.session_state.user = res.user
-            st.query_params.clear()
-            st.rerun()
-    except Exception as e:
-        st.sidebar.error(f"OAuth Exchange Error: {e}")
 
-if sb and st.session_state.user is None:
-    try:
-        res = sb.auth.get_user()
-        if res and res.user:
-            st.session_state.user = res.user
-    except Exception:
-        pass
-
-if st.session_state.user is None:
-    auth_page()
-    st.stop()
-
-
-# ---------------------------------------------------------------------------
 # Global Paystack Payment Callback Verification Handler
-# ---------------------------------------------------------------------------
 def handle_paystack_callbacks():
     query_params = st.query_params
     ref_param = query_params.get("reference") or query_params.get("trxref")
@@ -454,7 +451,32 @@ def handle_paystack_callbacks():
         st.query_params.clear()
 
 
+# Trigger callback verification globally
 handle_paystack_callbacks()
+
+
+if sb and "code" in st.query_params:
+    try:
+        auth_code = st.query_params["code"]
+        res = sb.auth.exchange_code_for_session({"auth_code": auth_code})
+        if res and res.user:
+            st.session_state.user = res.user
+            st.query_params.clear()
+            st.rerun()
+    except Exception as e:
+        st.sidebar.error(f"OAuth Exchange Error: {e}")
+
+if sb and st.session_state.user is None:
+    try:
+        res = sb.auth.get_user()
+        if res and res.user:
+            st.session_state.user = res.user
+    except Exception:
+        pass
+
+if st.session_state.user is None:
+    auth_page()
+    st.stop()
 
 
 # ---------------------------------------------------------------------------
