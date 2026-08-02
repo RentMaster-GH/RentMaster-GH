@@ -84,7 +84,7 @@ def get_client():
 
     try:
         return create_client(url, key)
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -172,7 +172,7 @@ def fmt_date(v):
 
 
 # ---------------------------------------------------------------------------
-# Data Fetching & Caching Helpers (DEFINED EARLY)
+# Data Fetching Helpers
 # ---------------------------------------------------------------------------
 @st.cache_data(ttl=5)
 def fetch_properties():
@@ -403,8 +403,7 @@ def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float,
 
 
 # ---------------------------------------------------------------------------
-# REUSABLE PAID ADVERTISEMENTS & AD SPACE MANAGEMENT COMPONENT
-# (Active Placements + Create & Pay for Advert)
+# REUSABLE PAID ADVERTISEMENTS COMPONENT
 # ---------------------------------------------------------------------------
 def render_ad_space_management(key_prefix: str = "ad"):
     st.markdown("#### Paid Advertisements & Ad Space Management")
@@ -562,24 +561,16 @@ st.markdown("""
         border-radius: 8px;
         font-weight: 500;
     }
-    .ad-card {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 
 # =========================================================================
-# LOGIN PAGE WITH "REMEMBER ME" AND AD SPACE MANAGEMENT
+# LOGIN PAGE
 # =========================================================================
 def auth_page():
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 2-column layout: Left for Login/Signup, Right for Paid Advertisements & Ad Space Management
     login_col, ad_col = st.columns([1, 1])
 
     with login_col:
@@ -602,8 +593,6 @@ def auth_page():
             with tab1:
                 email = st.text_input("Email", key="login_email")
                 password = st.text_input("Password", type="password", key="login_pw")
-
-                # 'REMEMBER ME' TICK BOX BELOW PASSWORD
                 remember_me = st.checkbox("Remember Me", value=True, key="login_remember_me")
 
                 if st.button("Log In", use_container_width=True, key="login_btn", type="primary"):
@@ -613,8 +602,9 @@ def auth_page():
                         try:
                             res = sb.auth.sign_in_with_password({"email": email, "password": password})
                             if res.user:
-                                st.session_state.user = res.user
-                                st.session_state.remember_me = remember_me
+                                # SAVE AUTH USER ISOLATED IN USER SESSION STATE
+                                st.session_state["user"] = res.user
+                                st.session_state["remember_me"] = remember_me
                                 st.rerun()
                         except Exception as e:
                             st.error(f"Login Error: {e}")
@@ -661,19 +651,18 @@ def auth_page():
                         except Exception as e:
                             st.error(f"Error: {e}")
 
-    # PAID ADVERTISEMENTS AND AD SPACE MANAGEMENT SECTION ON LOGIN PAGE
     with ad_col:
         render_ad_space_management(key_prefix="login_ad")
 
 
 # ---------------------------------------------------------------------------
-# Auth & Session Management
+# Auth & Session State Initialization (SAFE & ISOLATED PER SESSION)
 # ---------------------------------------------------------------------------
 if "user" not in st.session_state:
-    st.session_state.user = None
+    st.session_state["user"] = None
 
 if "app_currency" not in st.session_state:
-    st.session_state.app_currency = "GHS"
+    st.session_state["app_currency"] = "GHS"
 
 if not sb:
     st.warning("⚠️ Database credentials missing. Please set SUPABASE_URL and SUPABASE_KEY in environment variables.")
@@ -732,26 +721,21 @@ def handle_paystack_callbacks():
 handle_paystack_callbacks()
 
 
+# Handle OAuth code exchange isolated to this browser session
 if sb and "code" in st.query_params:
     try:
         auth_code = st.query_params["code"]
         res = sb.auth.exchange_code_for_session({"auth_code": auth_code})
         if res and res.user:
-            st.session_state.user = res.user
+            st.session_state["user"] = res.user
             st.query_params.clear()
             st.rerun()
     except Exception as e:
         st.sidebar.error(f"OAuth Exchange Error: {e}")
 
-if sb and st.session_state.user is None:
-    try:
-        res = sb.auth.get_user()
-        if res and res.user:
-            st.session_state.user = res.user
-    except Exception:
-        pass
 
-if st.session_state.user is None:
+# Stop unauthenticated users from accessing app dashboard
+if st.session_state.get("user") is None:
     auth_page()
     st.stop()
 
@@ -1030,8 +1014,8 @@ def page_user_profile():
 
             save_details = st.form_submit_button("Save Account Details", type="primary")
             if save_details:
-                st.session_state.profile_full_name = full_name
-                st.session_state.profile_phone = phone
+                st.session_state["profile_full_name"] = full_name
+                st.session_state["profile_phone"] = phone
                 st.toast("✅ Account details saved successfully!", icon="👤")
 
     with profile_tab2:
@@ -1052,7 +1036,7 @@ def page_user_profile():
         
         user_table_data = []
         user_table_data.append({
-            "User ID": user_id[:8] + "...",
+            "User ID": str(user_id)[:8] + "...",
             "Email": user_email,
             "Role": "System Administrator",
             "Status": "Active Now",
@@ -1061,7 +1045,7 @@ def page_user_profile():
 
         for l in landlords:
             user_table_data.append({
-                "User ID": l["id"][:8] + "...",
+                "User ID": str(l["id"])[:8] + "...",
                 "Email": l.get("email", "N/A"),
                 "Role": "Landlord",
                 "Status": "Active",
@@ -1855,13 +1839,12 @@ def page_settings():
             st.toggle("Enable Automated Payment Alerts", value=True)
 
         if st.button("Save System Preferences", type="primary", key="save_prefs"):
-            st.session_state.app_currency = selected_currency
+            st.session_state["app_currency"] = selected_currency
             st.toast(f"Preferences saved! Default currency set to {selected_currency}.", icon="✅")
             st.rerun()
 
     st.markdown("---")
 
-    # PAID ADVERTISEMENTS AND AD SPACE MANAGEMENT SECTION ON SETTINGS PAGE
     render_ad_space_management(key_prefix="settings_ad")
 
     st.markdown("---")
@@ -1920,12 +1903,11 @@ with st.sidebar:
         show_support_dialog()
 
     st.markdown("---")
-    if st.session_state.user:
-        user_email = getattr(st.session_state.user, "email", "User")
+    active_user = st.session_state.get("user")
+    if active_user:
+        user_email = getattr(active_user, "email", "User")
         st.write(f"👤 Logged in: **{user_email}**")
         if st.button("Logout", key="logout_btn"):
-            if sb:
-                sb.auth.sign_out()
             st.session_state.clear()
             st.rerun()
 
