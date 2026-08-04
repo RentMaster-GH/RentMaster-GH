@@ -3,6 +3,7 @@ RentMaster-GH - Rental Property Management Web App
 Full interactive UI backed by Supabase. Manages properties, tenants,
 payments, leases, maintenance requests, and landlords with a global dashboard overview.
 Includes Multi-Currency Paystack & International Card/MoMo Checkout & Split Payouts.
+Isolated Multi-Tenant Security: Users view ONLY their own properties & tenants.
 """
 
 import json
@@ -90,6 +91,19 @@ def get_client():
 
 sb = get_client()
 
+
+def get_active_user_info():
+    """
+    Safely retrieves active logged-in user ID and Email from Streamlit session state.
+    """
+    user = st.session_state.get("user")
+    if not user:
+        return None, None
+    user_id = getattr(user, "id", None)
+    user_email = getattr(user, "email", None)
+    return user_id, user_email
+
+
 # ---------------------------------------------------------------------------
 # Global Multi-Currency Engine & International Payout Bank Systems
 # ---------------------------------------------------------------------------
@@ -172,68 +186,98 @@ def fmt_date(v):
 
 
 # ---------------------------------------------------------------------------
-# Data Fetching Helpers
+# Data Fetching Helpers (ISOLATED & FILTERED PER LOGGED-IN USER)
 # ---------------------------------------------------------------------------
 @st.cache_data(ttl=5)
-def fetch_properties():
-    if not sb: return []
+def fetch_properties(user_id: str = None, user_email: str = None):
+    if not sb or not user_id: return []
     try:
-        r = sb.table("properties").select("*").order("created_at", desc=True).execute()
-        return r.data or []
-    except Exception: return []
-
-
-@st.cache_data(ttl=5)
-def fetch_landlords():
-    if not sb: return []
-    try:
-        r = sb.table("landlords").select("*").order("created_at", desc=True).execute()
-        return r.data or []
-    except Exception: return []
-
-
-@st.cache_data(ttl=5)
-def fetch_tenants():
-    if not sb: return []
-    try:
-        r = sb.table("tenants").select("*, properties(*, landlords(*))").order("created_at", desc=True).execute()
+        r = sb.table("properties").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
         return r.data or []
     except Exception:
         try:
-            r = sb.table("tenants").select("*, properties(*)").order("created_at", desc=True).execute()
+            r = sb.table("properties").select("*").eq("owner_id", user_id).order("created_at", desc=True).execute()
             return r.data or []
+        except Exception:
+            try:
+                r = sb.table("properties").select("*").order("created_at", desc=True).execute()
+                data = r.data or []
+                return [p for p in data if p.get("user_id") == user_id or p.get("owner_id") == user_id or p.get("user_email") == user_email]
+            except Exception: return []
+
+
+@st.cache_data(ttl=5)
+def fetch_landlords(user_id: str = None, user_email: str = None):
+    if not sb or not user_id: return []
+    try:
+        r = sb.table("landlords").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception:
+        try:
+            r = sb.table("landlords").select("*").order("created_at", desc=True).execute()
+            data = r.data or []
+            return [l for l in data if l.get("user_id") == user_id or l.get("user_email") == user_email]
         except Exception: return []
 
 
 @st.cache_data(ttl=5)
-def fetch_payments():
-    if not sb: return []
+def fetch_tenants(user_id: str = None, user_email: str = None):
+    if not sb or not user_id: return []
     try:
-        r = sb.table("payments").select("*, tenants(*)").order("payment_date", desc=True).execute()
-        return r.data or []
-    except Exception: return []
-
-
-@st.cache_data(ttl=5)
-def fetch_leases():
-    if not sb: return []
-    try:
-        r = sb.table("leases").select("*, properties(*), tenants(*)").order("created_at", desc=True).execute()
+        r = sb.table("tenants").select("*, properties(*, landlords(*))").eq("user_id", user_id).order("created_at", desc=True).execute()
         return r.data or []
     except Exception:
         try:
-            r = sb.table("leases").select("*, properties(*), tenants(*)").order("start_date", desc=True).execute()
+            r = sb.table("tenants").select("*, properties(*)").eq("user_id", user_id).order("created_at", desc=True).execute()
             return r.data or []
+        except Exception:
+            try:
+                r = sb.table("tenants").select("*, properties(*)").order("created_at", desc=True).execute()
+                data = r.data or []
+                return [t for t in data if t.get("user_id") == user_id or t.get("user_email") == user_email]
+            except Exception: return []
+
+
+@st.cache_data(ttl=5)
+def fetch_payments(user_id: str = None, user_email: str = None):
+    if not sb or not user_id: return []
+    try:
+        r = sb.table("payments").select("*, tenants(*)").eq("user_id", user_id).order("payment_date", desc=True).execute()
+        return r.data or []
+    except Exception:
+        try:
+            r = sb.table("payments").select("*, tenants(*)").order("payment_date", desc=True).execute()
+            data = r.data or []
+            return [p for p in data if p.get("user_id") == user_id or p.get("user_email") == user_email]
         except Exception: return []
 
 
 @st.cache_data(ttl=5)
-def fetch_maintenance():
-    if not sb: return []
+def fetch_leases(user_id: str = None, user_email: str = None):
+    if not sb or not user_id: return []
     try:
-        r = sb.table("maintenance_requests").select("*, properties(*), tenants(*)").order("created_at", desc=True).execute()
+        r = sb.table("leases").select("*, properties(*), tenants(*)").eq("user_id", user_id).order("created_at", desc=True).execute()
         return r.data or []
-    except Exception: return []
+    except Exception:
+        try:
+            r = sb.table("leases").select("*, properties(*), tenants(*)").order("created_at", desc=True).execute()
+            data = r.data or []
+            return [l for l in data if l.get("user_id") == user_id or l.get("user_email") == user_email]
+        except Exception: return []
+
+
+@st.cache_data(ttl=5)
+def fetch_maintenance(user_id: str = None, user_email: str = None):
+    if not sb or not user_id: return []
+    try:
+        r = sb.table("maintenance_requests").select("*, properties(*), tenants(*)").eq("user_id", user_id).order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception:
+        try:
+            r = sb.table("maintenance_requests").select("*, properties(*), tenants(*)").order("created_at", desc=True).execute()
+            data = r.data or []
+            return [m for m in data if m.get("user_id") == user_id or m.get("user_email") == user_email]
+        except Exception: return []
 
 
 @st.cache_data(ttl=5)
@@ -329,7 +373,7 @@ def verify_paystack_payment(reference: str):
         return {"status": False, "message": str(e)}
 
 
-def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: str, bank_name: str, account_number: str, bank_code: str, platform_fee_pct: float = 0.0, id_card_url: str = None):
+def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: str, bank_name: str, account_number: str, bank_code: str, platform_fee_pct: float = 0.0, id_card_url: str = None, user_id: str = None, user_email: str = None):
     if not sb:
         raise Exception("Database client not initialized.")
 
@@ -357,6 +401,11 @@ def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: s
         "paystack_subaccount_code": subaccount_code,
     }
 
+    if user_id:
+        payload["user_id"] = user_id
+    if user_email:
+        payload["user_email"] = user_email
+
     if id_card_url:
         payload["id_card_url"] = id_card_url
 
@@ -382,6 +431,9 @@ def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float,
         "status": "pending_payment",
         "reference": reference,
     }
+
+    if user_id:
+        ad_payload["user_id"] = user_id
 
     if sb:
         sb.table("ads").insert(ad_payload).execute()
@@ -605,6 +657,7 @@ def auth_page():
                                 # SAVE AUTH USER ISOLATED IN USER SESSION STATE
                                 st.session_state["user"] = res.user
                                 st.session_state["remember_me"] = remember_me
+                                clear_cache()
                                 st.rerun()
                         except Exception as e:
                             st.error(f"Login Error: {e}")
@@ -677,6 +730,7 @@ def handle_paystack_callbacks():
         return
 
     reference = str(ref_param)
+    user_id, user_email = get_active_user_info()
 
     if reference.startswith("AD-"):
         with st.spinner("Verifying Advert Payment..."):
@@ -699,14 +753,18 @@ def handle_paystack_callbacks():
                 meta = data.get("metadata", {})
 
                 try:
-                    sb.table("payments").insert({
+                    payload = {
                         "tenant_id": meta.get("tenant_id") if meta.get("tenant_id") else None,
                         "amount": data["amount"] / 100.0,
                         "payment_method": data.get("channel", "online_paystack"),
                         "notes": f"Paystack Ref: {reference} | Email: {data.get('customer', {}).get('email')}",
                         "payment_date": str(date.today()),
                         "status": "paid"
-                    }).execute()
+                    }
+                    if user_id: payload["user_id"] = user_id
+                    if user_email: payload["user_email"] = user_email
+
+                    sb.table("payments").insert(payload).execute()
 
                     clear_cache()
                     st.success(f"✅ Rent Payment of {fmt_money(data['amount']/100, data.get('currency'))} verified and credited!")
@@ -728,6 +786,7 @@ if sb and "code" in st.query_params:
         res = sb.auth.exchange_code_for_session({"auth_code": auth_code})
         if res and res.user:
             st.session_state["user"] = res.user
+            clear_cache()
             st.query_params.clear()
             st.rerun()
     except Exception as e:
@@ -770,8 +829,7 @@ def show_support_dialog():
                 st.error("Database connection missing.")
             else:
                 try:
-                    user = st.session_state.get("user")
-                    user_email = getattr(user, "email", None) if user else None
+                    user_id, user_email = get_active_user_info()
                     sb.table("support_requests").insert({
                         "category": category,
                         "subject": subject,
@@ -1022,8 +1080,8 @@ def page_user_profile():
         st.markdown("#### 👥 User Management")
         st.caption("Manage platform users, property managers, tenants, and staff roles.")
 
-        tenants = fetch_tenants()
-        landlords = fetch_landlords()
+        tenants = fetch_tenants(user_id, user_email)
+        landlords = fetch_landlords(user_id, user_email)
 
         col_u1, col_u2 = st.columns(2)
         with col_u1:
@@ -1127,11 +1185,13 @@ def page_dashboard():
     header()
     st.subheader("Dashboard Overview")
 
-    props = fetch_properties()
-    tenants = fetch_tenants()
-    payments = fetch_payments()
-    leases = fetch_leases()
-    maint = fetch_maintenance()
+    user_id, user_email = get_active_user_info()
+
+    props = fetch_properties(user_id, user_email)
+    tenants = fetch_tenants(user_id, user_email)
+    payments = fetch_payments(user_id, user_email)
+    leases = fetch_leases(user_id, user_email)
+    maint = fetch_maintenance(user_id, user_email)
 
     expected = sum(float(p.get("monthly_rent") or p.get("rent_amount") or 0) for p in props)
     collected = sum(float(p.get("amount", 0) or 0) for p in payments if p.get("status") == "paid")
@@ -1190,6 +1250,7 @@ def page_properties():
     st.subheader("Properties")
 
     curr_code = get_current_currency()
+    user_id, user_email = get_active_user_info()
 
     with st.expander("Add New Property", expanded=False):
         with st.form("add_property"):
@@ -1221,12 +1282,15 @@ def page_properties():
                         "is_occupied": is_occupied,
                         "description": desc,
                     }
+                    if user_id: payload["user_id"] = user_id
+                    if user_email: payload["user_email"] = user_email
+
                     sb.table("properties").insert(payload).execute()
                     clear_cache()
                     st.success(f"Property '{name}' added.")
                     st.rerun()
 
-    props = fetch_properties()
+    props = fetch_properties(user_id, user_email)
     if not props:
         st.info("No properties yet. Add one above.")
         return
@@ -1267,7 +1331,9 @@ def page_landlords():
     st.subheader("Landlord & Payout Management")
     st.caption("Configure payout destinations (Mobile Money, Local Bank, or SWIFT/IBAN) for automated Paystack rent splits.")
 
-    landlords = fetch_landlords()
+    user_id, user_email = get_active_user_info()
+
+    landlords = fetch_landlords(user_id, user_email)
     landlord_options = {"new": "➕ Add New Landlord"}
     for l in landlords:
         landlord_options[l["id"]] = f"{l['name']} ({l.get('phone', 'No Phone')})"
@@ -1334,7 +1400,9 @@ def page_landlords():
                             account_number=account_number,
                             bank_code=selected_bank_code,
                             platform_fee_pct=0.0,
-                            id_card_url=id_card_url
+                            id_card_url=id_card_url,
+                            user_id=user_id,
+                            user_email=user_email
                         )
                     clear_cache()
                     st.success(f"✅ Landlord registered! Paystack Subaccount Code: `{code}`")
@@ -1378,7 +1446,9 @@ def page_tenants():
     st.subheader("Tenants")
 
     curr_code = get_current_currency()
-    props = fetch_properties()
+    user_id, user_email = get_active_user_info()
+
+    props = fetch_properties(user_id, user_email)
     prop_options = {p["id"]: prop_label(p) for p in props} or {"": "No properties available"}
 
     with st.expander("Add New Tenant", expanded=False):
@@ -1427,12 +1497,15 @@ def page_tenants():
                         "is_active": active,
                         "id_card_url": id_card_url
                     }
+                    if user_id: payload["user_id"] = user_id
+                    if user_email: payload["user_email"] = user_email
+
                     sb.table("tenants").insert(payload).execute()
                     clear_cache()
                     st.success(f"Tenant '{name}' added successfully.")
                     st.rerun()
 
-    tenants = fetch_tenants()
+    tenants = fetch_tenants(user_id, user_email)
     if not tenants:
         st.info("No tenants yet. Add one above.")
         return
@@ -1471,8 +1544,10 @@ def page_payments():
     st.subheader("Rent Ledger & Payments Hub")
 
     curr_code = get_current_currency()
-    tenants = fetch_tenants()
-    all_payments = fetch_payments()
+    user_id, user_email = get_active_user_info()
+
+    tenants = fetch_tenants(user_id, user_email)
+    all_payments = fetch_payments(user_id, user_email)
 
     tab_ledger, tab_manual, tab_log = st.tabs([
         "📜 Tenant Rent Ledger & Pay Rent",
@@ -1544,7 +1619,8 @@ def page_payments():
                                     metadata={
                                         "type": "rent_payment",
                                         "tenant_id": selected_tenant_id,
-                                        "tenant_name": selected_tenant.get("name")
+                                        "tenant_name": selected_tenant.get("name"),
+                                        "user_id": user_id
                                     },
                                     subaccount=subaccount_code,
                                     currency=curr_code
@@ -1606,14 +1682,18 @@ def page_payments():
                 elif not sb:
                     st.error("Database connection missing.")
                 else:
-                    sb.table("payments").insert({
+                    payload = {
                         "tenant_id": tid,
                         "amount": float(amount),
                         "payment_method": method,
                         "notes": notes if notes else "Manual Entry",
                         "payment_date": str(pdate),
                         "status": status,
-                    }).execute()
+                    }
+                    if user_id: payload["user_id"] = user_id
+                    if user_email: payload["user_email"] = user_email
+
+                    sb.table("payments").insert(payload).execute()
                     clear_cache()
                     st.success("✅ Payment recorded into ledger successfully.")
                     st.rerun()
@@ -1667,8 +1747,10 @@ def page_leases():
     st.subheader("Leases")
 
     curr_code = get_current_currency()
-    props = fetch_properties()
-    tenants = fetch_tenants()
+    user_id, user_email = get_active_user_info()
+
+    props = fetch_properties(user_id, user_email)
+    tenants = fetch_tenants(user_id, user_email)
     prop_options = {p["id"]: prop_label(p) for p in props} or {"": "No properties available"}
     tenant_options = {t["id"]: tenant_label(t) for t in tenants} or {"": "No tenants available"}
 
@@ -1692,16 +1774,20 @@ def page_leases():
                 elif not sb:
                     st.error("Database connection missing.")
                 else:
-                    sb.table("leases").insert({
+                    payload = {
                         "property_id": pid, "tenant_id": tid,
                         "start_date": str(start), "end_date": str(end),
                         "deposit_amount": deposit, "status": status,
-                    }).execute()
+                    }
+                    if user_id: payload["user_id"] = user_id
+                    if user_email: payload["user_email"] = user_email
+
+                    sb.table("leases").insert(payload).execute()
                     clear_cache()
                     st.success("Lease created.")
                     st.rerun()
 
-    leases = fetch_leases()
+    leases = fetch_leases(user_id, user_email)
     if not leases:
         st.info("No leases yet. Create one above.")
         return
@@ -1734,8 +1820,10 @@ def page_maintenance():
     header()
     st.subheader("Maintenance Requests")
 
-    props = fetch_properties()
-    tenants = fetch_tenants()
+    user_id, user_email = get_active_user_info()
+
+    props = fetch_properties(user_id, user_email)
+    tenants = fetch_tenants(user_id, user_email)
     prop_options = {p["id"]: prop_label(p) for p in props} or {"": "No properties available"}
     tenant_options = {t["id"]: tenant_label(t) for t in tenants} or {"": "None"}
 
@@ -1759,17 +1847,21 @@ def page_maintenance():
                 elif not sb:
                     st.error("Database connection missing.")
                 else:
-                    sb.table("maintenance_requests").insert({
+                    payload = {
                         "property_id": pid,
                         "tenant_id": tid if (tid and tid != "") else None,
                         "title": title, "description": desc,
                         "priority": priority, "status": status,
-                    }).execute()
+                    }
+                    if user_id: payload["user_id"] = user_id
+                    if user_email: payload["user_email"] = user_email
+
+                    sb.table("maintenance_requests").insert(payload).execute()
                     clear_cache()
                     st.success("Maintenance request filed.")
                     st.rerun()
 
-    requests_list = fetch_maintenance()
+    requests_list = fetch_maintenance(user_id, user_email)
     if not requests_list:
         st.info("No maintenance requests yet.")
         return
@@ -1804,6 +1896,7 @@ def page_settings():
     st.subheader("Settings & Administration")
 
     curr_code = get_current_currency()
+    user_id, user_email = get_active_user_info()
 
     with st.container(border=True):
         col_info1, col_info2 = st.columns([3, 1])
@@ -1856,7 +1949,7 @@ def page_settings():
     with col1:
         st.download_button(
             "📥 Export Properties",
-            data=json.dumps(fetch_properties(), indent=2),
+            data=json.dumps(fetch_properties(user_id, user_email), indent=2),
             file_name="rentmaster_properties.json",
             mime="application/json",
             use_container_width=True
@@ -1864,7 +1957,7 @@ def page_settings():
     with col2:
         st.download_button(
             "📥 Export Payments",
-            data=json.dumps(fetch_payments(), indent=2),
+            data=json.dumps(fetch_payments(user_id, user_email), indent=2),
             file_name="rentmaster_payments.json",
             mime="application/json",
             use_container_width=True
@@ -1872,7 +1965,7 @@ def page_settings():
     with col3:
         st.download_button(
             "📥 Export Tenants",
-            data=json.dumps(fetch_tenants(), indent=2),
+            data=json.dumps(fetch_tenants(user_id, user_email), indent=2),
             file_name="rentmaster_tenants.json",
             mime="application/json",
             use_container_width=True
