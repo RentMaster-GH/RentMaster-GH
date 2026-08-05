@@ -1000,7 +1000,7 @@ def render_id_verification_widget(entity_type: str = "Tenant", key_prefix: str =
         <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
             <h6 style="margin: 0 0 0.4rem 0; color: #0369a1; font-weight: 600;">📌 {entity_type} ID Verification Guidelines</h6>
             <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: #0c4a6e; line-height: 1.4;">
-                <li><b>Accepted IDs:</b> National ID, Passport, Driver's License, Voter ID.</li>
+                <li><b>Accepted IDs:</b> Ghana Card / National ID, Passport, Driver's License, Voter ID.</li>
                 <li><b>Quality Standard:</b> All 4 corners visible, no glare or blur. Text must be legible.</li>
                 <li><b>Privacy Compliance:</b> Protected in accordance with the <i>Data Protection Act (Act 843)</i> / GDPR regulations.</li>
             </ul>
@@ -1334,6 +1334,8 @@ def page_landlords():
     user_id, user_email = get_active_user_info()
 
     landlords = fetch_landlords(user_id, user_email)
+    tenants = fetch_tenants(user_id, user_email)
+
     landlord_options = {"new": "➕ Add New Landlord"}
     for l in landlords:
         landlord_options[l["id"]] = f"{l['name']} ({l.get('phone', 'No Phone')})"
@@ -1377,7 +1379,36 @@ def page_landlords():
 
         landlord_id_file = render_id_verification_widget(entity_type="Landlord", key_prefix="landlord")
 
-        submitted = st.form_submit_button("Save Landlord Payout Details", type="primary", use_container_width=True)
+        # -------------------------------------------------------------------
+        # Ghana Rent Card Upload (Only appears if Landlord Country is "Ghana")
+        # -------------------------------------------------------------------
+        rent_card_file = None
+        selected_tenant_for_card = None
+
+        if country == "Ghana":
+            st.markdown("---")
+            st.markdown("##### 📋 Ghana Rent Card Upload (Ghana Landlords Only)")
+            st.caption("Landlords operating in Ghana can upload and assign an official Rent Card to their respective tenant.")
+
+            tenant_options_rc = {t["id"]: f"{t.get('name', 'Unnamed')} — {prop_label(t.get('properties'))}" for t in tenants} if tenants else {}
+
+            if not tenant_options_rc:
+                st.info("No active tenants found. Add a tenant first in the Tenants page to assign a Rent Card.")
+            else:
+                selected_tenant_for_card = st.selectbox(
+                    "Assign Rent Card to Tenant",
+                    options=["None"] + list(tenant_options_rc.keys()),
+                    format_func=lambda x: "Select Tenant..." if x == "None" else tenant_options_rc[x],
+                    key="ghana_rent_card_tenant_select"
+                )
+
+                rent_card_file = st.file_uploader(
+                    "Upload Ghana Rent Card File (PDF, PNG, JPG, JPEG)",
+                    type=["png", "jpg", "jpeg", "pdf"],
+                    key="ghana_rent_card_uploader"
+                )
+
+        submitted = st.form_submit_button("Save Landlord Details & Rent Card", type="primary", use_container_width=True)
 
         if submitted:
             if not name or not phone or not account_number:
@@ -1404,6 +1435,15 @@ def page_landlords():
                             user_id=user_id,
                             user_email=user_email
                         )
+
+                    # Upload and link Rent Card if provided
+                    if country == "Ghana" and rent_card_file and selected_tenant_for_card and selected_tenant_for_card != "None":
+                        with st.spinner("Uploading Rent Card & assigning to tenant..."):
+                            rc_url = upload_id_to_supabase(rent_card_file, f"rc_{selected_tenant_for_card}", folder="rent_cards")
+                            if rc_url and sb:
+                                sb.table("tenants").update({"rent_card_url": rc_url}).eq("id", selected_tenant_for_card).execute()
+                                st.toast("✅ Official Rent Card assigned to tenant!", icon="📋")
+
                     clear_cache()
                     st.success(f"✅ Landlord registered! Paystack Subaccount Code: `{code}`")
                     st.rerun()
@@ -1524,6 +1564,8 @@ def page_tenants():
                     st.caption(f"Phone: {t['phone']}")
                 if t.get("id_card_url"):
                     st.markdown(f"🆔 [View Verified ID Document]({t['id_card_url']})")
+                if t.get("rent_card_url"):
+                    st.markdown(f"📋 [View Official Ghana Rent Card]({t['rent_card_url']})")
             with col2:
                 prop = t.get("properties")
                 st.markdown(f"Property: {prop_label(prop)}")
@@ -1569,6 +1611,9 @@ def page_payments():
 
             selected_tenant = next((t for t in tenants if t["id"] == selected_tenant_id), None)
             ledger = compute_tenant_ledger(selected_tenant, all_payments)
+
+            if selected_tenant and selected_tenant.get("rent_card_url"):
+                st.info(f"📋 **Official Ghana Rent Card Issued:** [Click to View / Download Rent Card]({selected_tenant['rent_card_url']})")
 
             st.markdown("---")
             m1, m2, m3, m4 = st.columns(4)
