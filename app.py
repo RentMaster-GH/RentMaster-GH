@@ -1000,7 +1000,7 @@ def render_id_verification_widget(entity_type: str = "Tenant", key_prefix: str =
         <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
             <h6 style="margin: 0 0 0.4rem 0; color: #0369a1; font-weight: 600;">📌 {entity_type} ID Verification Guidelines</h6>
             <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: #0c4a6e; line-height: 1.4;">
-                <li><b>Accepted IDs:</b> Ghana Card / National ID, Passport, Driver's License, Voter ID.</li>
+                <li><b>Accepted IDs:</b> National ID, Passport, Driver's License, Voter ID.</li>
                 <li><b>Quality Standard:</b> All 4 corners visible, no glare or blur. Text must be legible.</li>
                 <li><b>Privacy Compliance:</b> Protected in accordance with the <i>Data Protection Act (Act 843)</i> / GDPR regulations.</li>
             </ul>
