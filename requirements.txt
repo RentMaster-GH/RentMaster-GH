@@ -1,5 +1,5 @@
-starlette<0.45.0
-streamlit>=1.38.0
+starlette==0.38.2
+streamlit>=1.40.0
 supabase
 requests
 python-dotenv
