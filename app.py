@@ -1422,6 +1422,82 @@ def page_landlords():
             st.markdown("##### 📋 Ghana Rent Card Upload (Ghana Landlords Only)")
             st.caption("Landlords operating in Ghana can upload and assign an official Rent Card to their respective tenant. Clicking **📢 Publish to Tenant** explicitly makes the document visible to that tenant on their portal.")
 
+            if not tenants:
+                st.info("No active tenants found. Add a tenant first in the Tenants page to publish a Rent Card.")
+            else:
+                with st.form("ghana_rent_card_publish_form", clear_on_submit=False):
+                    tenant_options_rc = {t["id"]: f"{t.get('name', 'Unnamed')} — {prop_label(t.get('properties'))}" for t in tenants}
+
+                    selected_tenant_for_card = st.selectbox(
+                        "Assign Rent Card to Tenant *",
+                        options=list(tenant_options_rc.keys()),
+                        format_func=lambda x: tenant_options_rc[x],
+                        key="ghana_rent_card_tenant_select"
+                    )
+
+                    rent_card_file = st.file_uploader(
+                        "Upload Ghana Rent Card File (PDF, PNG, JPG, JPEG) *",
+                        type=["png", "jpg", "jpeg", "pdf"],
+                        key="ghana_rent_card_uploader"
+                    )
+
+                    publish_rc_submitted = st.form_submit_button("📢 Publish to Tenant", type="primary", use_container_width=True)
+
+                    if publish_rc_submitted:
+                        if not rent_card_file:
+                            st.error("Please select a Rent Card file to upload.")
+                        elif not selected_tenant_for_card:
+                            st.error("Please select a tenant to publish the Rent Card to.")
+                        else:
+                            with st.spinner("Uploading Rent Card & publishing to tenant portal..."):
+                                rc_url = upload_id_to_supabase(rent_card_file, f"rc_{selected_tenant_for_card}", folder="rent_cards")
+                                if rc_url and sb:
+                                    sb.table("tenants").update({"rent_card_url": rc_url}).eq("id", selected_tenant_for_card).execute()
+                                    clear_cache()
+                                    st.success("✅ Rent Card published! The document is now visible to the tenant on their portal.")
+                                    st.rerun()
+
+    if landlords:
+        st.markdown("---")
+        st.markdown(f"**{len(landlords)} Landlords Registered**")
+        for l in landlords:
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
+                with c1:
+                    st.markdown(f"**{l.get('name', 'Unnamed')}**")
+                    if l.get('email'):
+                        st.caption(f"Email: {l['email']}")
+                    if l.get('phone'):
+                        st.caption(f"Phone: {l['phone']}")
+                    if l.get('id_card_url'):
+                        st.markdown(f"🆔 [View Verified ID Document]({l['id_card_url']})")
+                with c2:
+                    st.markdown(f"Provider: **{l.get('bank_name', '-')}**")
+                    st.caption(f"Account: {l.get('account_number', '-')}")
+                with c3:
+                    sub_code = l.get('paystack_subaccount_code')
+                    if sub_code:
+                        st.markdown(f"Subaccount: `{sub_code}`")
+                    else:
+                        st.caption("Subaccount: Unlinked")
+                with c4:
+                    if st.button("Delete", key=f"del_landlord_{l['id']}", type="secondary"):
+                        if sb:
+                            sb.table("landlords").delete().eq("id", l["id"]).execute()
+                            clear_cache()
+                            st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to save details: {e}")
+
+    # -------------------------------------------------------------------
+    # Ghana Rent Card Upload & Publish Section (Dedicated for Ghana Landlords)
+    # -------------------------------------------------------------------
+    if country == "Ghana":
+        st.markdown("---")
+        with st.container(border=True):
+            st.markdown("##### 📋 Ghana Rent Card Upload (Ghana Landlords Only)")
+            st.caption("Landlords operating in Ghana can upload and assign an official Rent Card to their respective tenant. Clicking **📢 Publish to Tenant** explicitly makes the document visible to that tenant on their portal.")
+
             with st.form("ghana_rent_card_publish_form", clear_on_submit=False):
                 tenant_options_rc = {t["id"]: f"{t.get('name', 'Unnamed')} — {prop_label(t.get('properties'))}" for t in tenants} if tenants else {}
 
