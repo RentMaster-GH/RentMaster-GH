@@ -783,16 +783,13 @@ handle_paystack_callbacks()
 if sb and "code" in st.query_params:
     try:
         auth_code = st.query_params["code"]
-        # Clear URL params immediately so expired codes don't stick in the URL bar
         st.query_params.clear()
-
         res = sb.auth.exchange_code_for_session({"auth_code": auth_code})
         if res and res.user:
             st.session_state["user"] = res.user
             clear_cache()
             st.rerun()
     except Exception as e:
-        # Show a friendly message if the PKCE verifier was lost during redirect
         st.sidebar.warning("🔐 Google login session expired. Please click 'Continue with Google' again.")
 
 
@@ -1027,24 +1024,32 @@ def render_id_verification_widget(entity_type: str = "Tenant", key_prefix: str =
             key=f"{key_prefix}_file_dropzone"
         )
     else:
-        st.info("📷 **Live Camera Active:** Camera stream initializes automatically. Align ID card inside frame and click 'Take Photo'.")
+        st.info("📷 **Live Camera Stream Initializing:** Allow camera access in your browser if prompted. Align ID card inside frame and click 'Take Photo'.")
+        
         uploaded_id_file = st.camera_input(
             f"Take photo of {entity_type} ID Card",
-            key=f"{key_prefix}_camera_capture"
+            key=f"{key_prefix}_camera_capture",
+            help="Align ID card inside frame and click 'Take Photo'"
         )
-        
-        # JavaScript helper to auto-click camera start button if browser demands user gesture
+
+        # JavaScript helper to auto-trigger camera activation
         components.html(
             """
             <script>
-            setTimeout(function() {
-                const buttons = window.parent.document.querySelectorAll('button');
+            function autoStartCamera() {
+                const doc = window.parent.document;
+                const buttons = doc.querySelectorAll('button');
                 for (let btn of buttons) {
-                    if (btn.innerText.includes('Turn on camera') || btn.innerText.includes('Start camera')) {
+                    const txt = btn.innerText || btn.textContent || "";
+                    if (txt.includes('Turn on camera') || txt.includes('Start camera') || txt.includes('Allow access')) {
                         btn.click();
+                        break;
                     }
                 }
-            }, 300);
+            }
+            autoStartCamera();
+            setTimeout(autoStartCamera, 250);
+            setTimeout(autoStartCamera, 600);
             </script>
             """,
             height=0,
