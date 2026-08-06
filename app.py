@@ -1000,7 +1000,7 @@ def render_id_verification_widget(entity_type: str = "Tenant", key_prefix: str =
         <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
             <h6 style="margin: 0 0 0.4rem 0; color: #0369a1; font-weight: 600;">📌 {entity_type} ID Verification Guidelines</h6>
             <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: #0c4a6e; line-height: 1.4;">
-                <li><b>Accepted IDs:</b> National ID, Passport, Driver's License, Voter ID.</li>
+                <li><b>Accepted IDs:</b> Ghana Card / National ID, Passport, Driver's License, Voter ID.</li>
                 <li><b>Quality Standard:</b> All 4 corners visible, no glare or blur. Text must be legible.</li>
                 <li><b>Privacy Compliance:</b> Protected in accordance with the <i>Data Protection Act (Act 843)</i> / GDPR regulations.</li>
             </ul>
@@ -1024,7 +1024,29 @@ def render_id_verification_widget(entity_type: str = "Tenant", key_prefix: str =
             key=f"{key_prefix}_file_dropzone"
         )
     else:
-        uploaded_id_file = st.camera_input(f"Take photo of {entity_type} ID Card", key=f"{key_prefix}_camera_capture")
+        st.info("📷 **Live Camera Active:** Camera stream initializes automatically. Align ID card inside frame and click 'Take Photo'.")
+        uploaded_id_file = st.camera_input(
+            f"Take photo of {entity_type} ID Card",
+            key=f"{key_prefix}_camera_capture"
+        )
+        
+        # JavaScript helper to auto-click camera start button if browser demands user gesture
+        components.html(
+            """
+            <script>
+            setTimeout(function() {
+                const buttons = window.parent.document.querySelectorAll('button');
+                for (let btn of buttons) {
+                    if (btn.innerText.includes('Turn on camera') || btn.innerText.includes('Start camera')) {
+                        btn.click();
+                    }
+                }
+            }, 300);
+            </script>
+            """,
+            height=0,
+            width=0
+        )
 
     if uploaded_id_file:
         st.success("✅ Document captured successfully!")
@@ -1357,6 +1379,11 @@ def page_landlords():
     elif selected_landlord:
         st.warning("⚠️ No Paystack Subaccount generated yet. Save payout details to enable automatic splits.")
 
+    # ID Verification Widget rendered outside form for instant camera auto-start
+    st.markdown("#### 1. Landlord KYC Identity Verification")
+    landlord_id_file = render_id_verification_widget(entity_type="Landlord", key_prefix="landlord")
+
+    st.markdown("#### 2. Landlord Payout Destination Details")
     with st.form("landlord_payout_form", clear_on_submit=False):
         col1, col2 = st.columns(2)
 
@@ -1376,8 +1403,6 @@ def page_landlords():
             )
             selected_bank_code = available_banks[bank_name]
             st.text_input("Bank Code", value=selected_bank_code, disabled=True)
-
-        landlord_id_file = render_id_verification_widget(entity_type="Landlord", key_prefix="landlord")
 
         submitted = st.form_submit_button("Save Landlord Payout Details", type="primary", use_container_width=True)
 
@@ -1499,6 +1524,9 @@ def page_tenants():
     prop_options = {p["id"]: prop_label(p) for p in props} or {"": "No properties available"}
 
     with st.expander("Add New Tenant", expanded=False):
+        st.markdown("##### Tenant Identity Document (KYC)")
+        id_file_data = render_id_verification_widget(entity_type="Tenant", key_prefix="tenant")
+
         with st.form("add_tenant"):
             col1, col2 = st.columns(2)
             with col1:
@@ -1517,8 +1545,6 @@ def page_tenants():
                 lease_end = st.date_input("Lease End", value=date.today() + timedelta(days=365))
 
             active = st.checkbox("Active Tenant", value=True)
-
-            id_file_data = render_id_verification_widget(entity_type="Tenant", key_prefix="tenant")
 
             submitted = st.form_submit_button("Add Tenant", type="primary")
 
