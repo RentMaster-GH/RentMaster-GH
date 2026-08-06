@@ -783,14 +783,17 @@ handle_paystack_callbacks()
 if sb and "code" in st.query_params:
     try:
         auth_code = st.query_params["code"]
+        # Clear URL params immediately so expired codes don't stick in the URL bar
+        st.query_params.clear()
+
         res = sb.auth.exchange_code_for_session({"auth_code": auth_code})
         if res and res.user:
             st.session_state["user"] = res.user
             clear_cache()
-            st.query_params.clear()
             st.rerun()
     except Exception as e:
-        st.sidebar.error(f"OAuth Exchange Error: {e}")
+        # Show a friendly message if the PKCE verifier was lost during redirect
+        st.sidebar.warning("🔐 Google login session expired. Please click 'Continue with Google' again.")
 
 
 # Stop unauthenticated users from accessing app dashboard
