@@ -380,7 +380,7 @@ def verify_paystack_payment(reference: str):
         return {"status": False, "message": str(e)}
 
 
-def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: str, bank_name: str, account_number: str, bank_code: str, platform_fee_pct: float = 0.0, id_card_url: str = None, user_id: str = None, user_email: str = None):
+def save_landlord_bank_details(landlord_id: str, name: str, email: str, phone: str, bank_name: str, account_number: str, bank_code: str, platform_fee_pct: float = 5.0, id_card_url: str = None, user_id: str = None, user_email: str = None):
     if not sb:
         raise Exception("Database client not initialized.")
 
