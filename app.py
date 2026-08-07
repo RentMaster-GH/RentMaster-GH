@@ -4,15 +4,17 @@ Full interactive UI backed by Supabase. Manages properties, tenants,
 payments, leases, maintenance requests, and landlords with a global dashboard overview.
 Includes Multi-Currency Paystack & International Card/MoMo Checkout & Split Payouts.
 Isolated Multi-Tenant Security: Users view ONLY their own properties & tenants.
+Persistent Cookie Sessions: Retains user login across code reboots & closed tabs.
 """
 
 import json
 import os
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
+import extra_streamlit_components as stx
 from dotenv import load_dotenv
 from supabase import create_client
 from streamlit.errors import StreamlitSecretNotFoundError
@@ -29,6 +31,17 @@ st.set_page_config(
 
 # Load environment variables
 load_dotenv()
+
+
+# ---------------------------------------------------------------------------
+# Persistent Cookie Manager Setup
+# ---------------------------------------------------------------------------
+@st.cache_resource
+def get_cookie_manager():
+    return stx.CookieManager()
+
+
+cookie_manager = get_cookie_manager()
 
 
 def inject_google_analytics(measurement_id="G-EFD2P6FKM5"):
@@ -654,9 +667,19 @@ def auth_page():
                         try:
                             res = sb.auth.sign_in_with_password({"email": email, "password": password})
                             if res.user:
-                                # SAVE AUTH USER ISOLATED IN USER SESSION STATE
                                 st.session_state["user"] = res.user
                                 st.session_state["remember_me"] = remember_me
+                                
+                                # SAVE PERSISTENT BROWSER COOKIE (Valid for 30 Days)
+                                if res.session:
+                                    expires_at = datetime.now() + timedelta(days=30)
+                                    cookie_data = json.dumps({
+                                        "refresh_token": res.session.refresh_token,
+                                        "access_token": res.session.access_token,
+                                        "user_email": res.user.email
+                                    })
+                                    cookie_manager.set("rentmaster_session", cookie_data, expires_at=expires_at)
+                                
                                 clear_cache()
                                 st.rerun()
                         except Exception as e:
@@ -709,7 +732,7 @@ def auth_page():
 
 
 # ---------------------------------------------------------------------------
-# Auth & Session State Initialization (SAFE & ISOLATED PER SESSION)
+# Auth & Session State Initialization (SAFE, PERSISTENT & ISOLATED)
 # ---------------------------------------------------------------------------
 if "user" not in st.session_state:
     st.session_state["user"] = None
@@ -719,6 +742,28 @@ if "app_currency" not in st.session_state:
 
 if not sb:
     st.warning("⚠️ Database credentials missing. Please set SUPABASE_URL and SUPABASE_KEY in environment variables.")
+
+
+# ---------------------------------------------------------------------------
+# PERSISTENT COOKIE AUTO-LOGIN RESTORATION (Prevents logouts on code reboots)
+# ---------------------------------------------------------------------------
+if st.session_state.get("user") is None and sb:
+    try:
+        saved_session_cookie = cookie_manager.get(cookie="rentmaster_session")
+        if saved_session_cookie:
+            session_data = json.loads(saved_session_cookie) if isinstance(saved_session_cookie, str) else saved_session_cookie
+            ref_token = session_data.get("refresh_token")
+            acc_token = session_data.get("access_token")
+
+            if ref_token and acc_token:
+                res = sb.auth.set_session(acc_token, ref_token)
+                if res and res.user:
+                    st.session_state["user"] = res.user
+    except Exception:
+        try:
+            cookie_manager.delete("rentmaster_session")
+        except Exception:
+            pass
 
 
 # Global Paystack Payment Callback Verification Handler
@@ -787,6 +832,17 @@ if sb and "code" in st.query_params:
         res = sb.auth.exchange_code_for_session({"auth_code": auth_code})
         if res and res.user:
             st.session_state["user"] = res.user
+
+            # SAVE PERSISTENT BROWSER COOKIE FOR GOOGLE OAUTH USER
+            if res.session:
+                expires_at = datetime.now() + timedelta(days=30)
+                cookie_data = json.dumps({
+                    "refresh_token": res.session.refresh_token,
+                    "access_token": res.session.access_token,
+                    "user_email": res.user.email
+                })
+                cookie_manager.set("rentmaster_session", cookie_data, expires_at=expires_at)
+
             clear_cache()
             st.rerun()
     except Exception as e:
@@ -2087,6 +2143,15 @@ with st.sidebar:
         user_email = getattr(active_user, "email", "User")
         st.write(f"👤 Logged in: **{user_email}**")
         if st.button("Logout", key="logout_btn"):
+            try:
+                cookie_manager.delete("rentmaster_session")
+            except Exception:
+                pass
+            if sb:
+                try:
+                    sb.auth.sign_out()
+                except Exception:
+                    pass
             st.session_state.clear()
             st.rerun()
 
