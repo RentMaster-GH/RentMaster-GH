@@ -32,16 +32,10 @@ st.set_page_config(
 # Load environment variables
 load_dotenv()
 
-
 # ---------------------------------------------------------------------------
-# Persistent Cookie Manager Setup
+# Persistent Cookie Manager Setup (Direct Instantiation - No Cache Decorator)
 # ---------------------------------------------------------------------------
-@st.cache_resource
-def get_cookie_manager():
-    return stx.CookieManager()
-
-
-cookie_manager = get_cookie_manager()
+cookie_manager = stx.CookieManager(key="rentmaster_cookie_mgr")
 
 
 def inject_google_analytics(measurement_id="G-EFD2P6FKM5"):
