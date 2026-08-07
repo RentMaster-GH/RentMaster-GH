@@ -1,5 +1,5 @@
-starlette==0.38.2
-streamlit>=1.40.0
+streamlit
 supabase
-requests
+extra-streamlit-components
 python-dotenv
+requests
