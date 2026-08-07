@@ -33,7 +33,7 @@ st.set_page_config(
 load_dotenv()
 
 # ---------------------------------------------------------------------------
-# Persistent Cookie Manager Setup (Direct Instantiation - No Cache Decorator)
+# Persistent Cookie Manager Setup (Direct Instantiation - NO Cache Decorator)
 # ---------------------------------------------------------------------------
 cookie_manager = stx.CookieManager(key="rentmaster_cookie_mgr")
 
