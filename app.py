@@ -39,7 +39,7 @@ from ui.pages_core import (
 )
 from ui.pages_management import (
     page_properties, page_landlords, page_tenants,
-    page_payments, page_leases, page_maintenance
+    page_payments, page_leases
 )
 from ui.tenant_portal import render_tenant_portal
 from ui.sponsor_portal import render_sponsor_portal, show_sponsor_support_dialog
@@ -386,15 +386,15 @@ if user_role == "tenant":
         "Settings": page_settings,
         "Sponsor Portal": render_sponsor_portal,
     }
-else:  # Landlord / Property Manager View ('Tenants' and 'Tenant Portal' EXCLUDED HERE)
+else:  # Landlord / Property Manager View ('Maintenance' EXCLUDED)
     PAGES = {
         "Dashboard": page_dashboard,
         "User Profile": page_user_profile,
         "Properties": page_properties,
         "Landlords": page_landlords,
+        "Tenants": page_tenants,
         "Payments": page_payments,
         "Leases": page_leases,
-        "Maintenance": page_maintenance,
         "Settings": page_settings,
         "Sponsor Portal": render_sponsor_portal,
     }
