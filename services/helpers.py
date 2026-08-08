@@ -1,9 +1,54 @@
 # services/helpers.py
 import os
 import streamlit as st
+import streamlit.components.v1 as components
 from datetime import date
 from streamlit.errors import StreamlitSecretNotFoundError
 
+
+# ---------------------------------------------------------------------------
+# Google Analytics & Site Verification Injectors
+# ---------------------------------------------------------------------------
+def inject_google_analytics(measurement_id="G-EFD2P6FKM5"):
+    """
+    Injects Google Analytics 4 tracking snippet.
+    """
+    ga_html = f"""
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id={measurement_id}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){{dataLayer.push(arguments);}}
+      gtag('js', new Date());
+      gtag('config', '{measurement_id}');
+    </script>
+    """
+    components.html(ga_html, height=0, width=0)
+
+
+def inject_google_site_verification(verification_code="SXu9dztavBBjKgrko60Tx2CjufX2KvyRhW42SOczZrc"):
+    """
+    Injects Google Site Verification meta tag into the main browser document head.
+    """
+    verification_js = f"""
+    <script>
+      (function() {{
+        const parentHead = window.parent.document.head;
+        if (!parentHead.querySelector('meta[name="google-site-verification"]')) {{
+          const meta = window.parent.document.createElement('meta');
+          meta.name = 'google-site-verification';
+          meta.content = '{verification_code}';
+          parentHead.appendChild(meta);
+        }}
+      }})();
+    </script>
+    """
+    components.html(verification_js, height=0, width=0)
+
+
+# ---------------------------------------------------------------------------
+# Currency & Payout Data Structures
+# ---------------------------------------------------------------------------
 SUPPORTED_CURRENCIES = {
     "GHS": {"symbol": "GHs", "name": "Ghanaian Cedi (GHs / GH₵)"},
     "USD": {"symbol": "$", "name": "US Dollar ($)"},
