@@ -216,117 +216,120 @@ def fmt_date(v):
 
 
 # ---------------------------------------------------------------------------
-# Data Fetching Helpers (ISOLATED & FILTERED PER LOGGED-IN USER)
+# Logging Setup
 # ---------------------------------------------------------------------------
-@st.cache_data(ttl=5)
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("RentMaster")
+
+
+# ---------------------------------------------------------------------------
+# Data Fetching Helpers (STRICT & SECURE DATABASE-LEVEL FILTERING)
+# ---------------------------------------------------------------------------
+@st.cache_data(ttl=10)
 def fetch_properties(user_id: str = None, user_email: str = None):
-    if not sb or not user_id: return []
+    """
+    Fetches properties owned strictly by the logged-in user.
+    """
+    if not sb or not user_id:
+        return []
     try:
         r = sb.table("properties").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
         return r.data or []
-    except Exception:
-        try:
-            r = sb.table("properties").select("*").eq("owner_id", user_id).order("created_at", desc=True).execute()
-            return r.data or []
-        except Exception:
-            try:
-                r = sb.table("properties").select("*").order("created_at", desc=True).execute()
-                data = r.data or []
-                return [p for p in data if p.get("user_id") == user_id or p.get("owner_id") == user_id or p.get("user_email") == user_email]
-            except Exception: return []
+    except Exception as e:
+        logger.error(f"Failed to fetch properties for user_id '{user_id}': {e}", exc_info=True)
+        return []
 
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=10)
 def fetch_landlords(user_id: str = None, user_email: str = None):
-    if not sb or not user_id: return []
+    """
+    Fetches landlords registered strictly by the logged-in user.
+    """
+    if not sb or not user_id:
+        return []
     try:
         r = sb.table("landlords").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
         return r.data or []
-    except Exception:
-        try:
-            r = sb.table("landlords").select("*").order("created_at", desc=True).execute()
-            data = r.data or []
-            return [l for l in data if l.get("user_id") == user_id or l.get("user_email") == user_email]
-        except Exception: return []
+    except Exception as e:
+        logger.error(f"Failed to fetch landlords for user_id '{user_id}': {e}", exc_info=True)
+        return []
 
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=10)
 def fetch_tenants(user_id: str = None, user_email: str = None):
-    if not sb or not user_id: return []
+    """
+    Fetches tenants registered strictly by the logged-in user with linked properties and landlords.
+    """
+    if not sb or not user_id:
+        return []
     try:
         r = sb.table("tenants").select("*, properties(*, landlords(*))").eq("user_id", user_id).order("created_at", desc=True).execute()
         return r.data or []
-    except Exception:
-        try:
-            r = sb.table("tenants").select("*, properties(*)").eq("user_id", user_id).order("created_at", desc=True).execute()
-            return r.data or []
-        except Exception:
-            try:
-                r = sb.table("tenants").select("*, properties(*)").order("created_at", desc=True).execute()
-                data = r.data or []
-                return [t for t in data if t.get("user_id") == user_id or t.get("user_email") == user_email]
-            except Exception: return []
+    except Exception as e:
+        logger.error(f"Failed to fetch tenants for user_id '{user_id}': {e}", exc_info=True)
+        return []
 
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=10)
 def fetch_payments(user_id: str = None, user_email: str = None):
-    if not sb or not user_id: return []
+    """
+    Fetches payment records belonging strictly to the logged-in user.
+    """
+    if not sb or not user_id:
+        return []
     try:
         r = sb.table("payments").select("*, tenants(*)").eq("user_id", user_id).order("payment_date", desc=True).execute()
         return r.data or []
-    except Exception:
-        try:
-            r = sb.table("payments").select("*, tenants(*)").order("payment_date", desc=True).execute()
-            data = r.data or []
-            return [p for p in data if p.get("user_id") == user_id or p.get("user_email") == user_email]
-        except Exception: return []
+    except Exception as e:
+        logger.error(f"Failed to fetch payments for user_id '{user_id}': {e}", exc_info=True)
+        return []
 
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=10)
 def fetch_leases(user_id: str = None, user_email: str = None):
-    if not sb or not user_id: return []
+    """
+    Fetches lease agreements belonging strictly to the logged-in user.
+    """
+    if not sb or not user_id:
+        return []
     try:
         r = sb.table("leases").select("*, properties(*), tenants(*)").eq("user_id", user_id).order("created_at", desc=True).execute()
         return r.data or []
-    except Exception:
-        try:
-            r = sb.table("leases").select("*, properties(*), tenants(*)").order("created_at", desc=True).execute()
-            data = r.data or []
-            return [l for l in data if l.get("user_id") == user_id or l.get("user_email") == user_email]
-        except Exception: return []
+    except Exception as e:
+        logger.error(f"Failed to fetch leases for user_id '{user_id}': {e}", exc_info=True)
+        return []
 
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=10)
 def fetch_maintenance(user_id: str = None, user_email: str = None):
-    if not sb or not user_id: return []
+    """
+    Fetches maintenance requests belonging strictly to the logged-in user.
+    """
+    if not sb or not user_id:
+        return []
     try:
         r = sb.table("maintenance_requests").select("*, properties(*), tenants(*)").eq("user_id", user_id).order("created_at", desc=True).execute()
         return r.data or []
-    except Exception:
-        try:
-            r = sb.table("maintenance_requests").select("*, properties(*), tenants(*)").order("created_at", desc=True).execute()
-            data = r.data or []
-            return [m for m in data if m.get("user_id") == user_id or m.get("user_email") == user_email]
-        except Exception: return []
+    except Exception as e:
+        logger.error(f"Failed to fetch maintenance requests for user_id '{user_id}': {e}", exc_info=True)
+        return []
 
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=15)
 def fetch_ads():
-    if not sb: return []
+    """
+    Fetches active advertisement placements (publicly readable).
+    """
+    if not sb:
+        return []
     try:
         r = sb.table("ads").select("*").order("created_at", desc=True).execute()
         return r.data or []
-    except Exception: return []
-
-
-def clear_cache():
-    fetch_properties.clear()
-    fetch_landlords.clear()
-    fetch_tenants.clear()
-    fetch_payments.clear()
-    fetch_leases.clear()
-    fetch_maintenance.clear()
-    fetch_ads.clear()
+    except Exception as e:
+        logger.error(f"Failed to fetch ads: {e}", exc_info=True)
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -783,30 +786,56 @@ if st.session_state.get("user") is None and sb:
             pass
 
 
-# Global Paystack Payment Callback Verification Handler
+# ---------------------------------------------------------------------------
+# Global Paystack Payment Callback Verification Handler (OPTIMIZED & PROTECTED)
+# ---------------------------------------------------------------------------
 def handle_paystack_callbacks():
+    """
+    Verifies Paystack payment references ONCE per transaction.
+    Prevents infinite loop API calls and duplicate database entries on Streamlit reruns.
+    """
     query_params = st.query_params
     ref_param = query_params.get("reference") or query_params.get("trxref")
 
     if not ref_param or not sb:
         return
 
-    reference = str(ref_param)
+    reference = str(ref_param).strip()
+
+    # 1. SESSION STATE GUARD: Skip if reference was already processed in current session
+    processed_key = f"processed_paystack_ref_{reference}"
+    if st.session_state.get(processed_key):
+        try:
+            st.query_params.clear()
+        except Exception:
+            pass
+        return
+
+    # Mark as processing immediately to prevent race conditions
+    st.session_state[processed_key] = True
     user_id, user_email = get_active_user_info()
 
+    # -----------------------------------------------------------------------
+    # ADVERT PAYMENT VERIFICATION
+    # -----------------------------------------------------------------------
     if reference.startswith("AD-"):
-        with st.spinner("Verifying Advert Payment..."):
+        with st.spinner("Verifying Advert Payment with Paystack..."):
             verification = verify_paystack_payment(reference)
             if verification.get("status") and verification.get("data", {}).get("status") == "success":
                 try:
                     sb.table("ads").update({"status": "paid"}).eq("reference", reference).execute()
                     clear_cache()
+                    st.toast(f"✅ Advert Payment Verified! Ref: {reference}", icon="🎉")
                     st.success(f"✅ Payment for Advert (Ref: `{reference}`) verified successfully! Campaign activated.")
                 except Exception as e:
+                    logger.error(f"Error updating advert status for reference '{reference}': {e}", exc_info=True)
                     st.error(f"Error updating advert status: {e}")
             else:
                 st.error("❌ Advert payment verification failed or was cancelled.")
-        st.query_params.clear()
+
+    # -----------------------------------------------------------------------
+    # RENT PAYMENT VERIFICATION
+    # -----------------------------------------------------------------------
     else:
         with st.spinner("Verifying Paystack Rent Payment status..."):
             verification = verify_paystack_payment(reference)
@@ -815,26 +844,37 @@ def handle_paystack_callbacks():
                 meta = data.get("metadata", {})
 
                 try:
-                    payload = {
-                        "tenant_id": meta.get("tenant_id") if meta.get("tenant_id") else None,
-                        "amount": data["amount"] / 100.0,
-                        "payment_method": data.get("channel", "online_paystack"),
-                        "notes": f"Paystack Ref: {reference} | Email: {data.get('customer', {}).get('email')}",
-                        "payment_date": str(date.today()),
-                        "status": "paid"
-                    }
-                    if user_id: payload["user_id"] = user_id
-                    if user_email: payload["user_email"] = user_email
+                    # 2. DUPLICATE CHECK: Verify if reference is already logged in database
+                    existing_check = sb.table("payments").select("id").ilike("notes", f"%{reference}%").execute()
+                    if existing_check and existing_check.data:
+                        st.info(f"ℹ️ Payment Ref `{reference}` was already recorded previously.")
+                    else:
+                        payload = {
+                            "tenant_id": meta.get("tenant_id") if meta.get("tenant_id") else None,
+                            "amount": data["amount"] / 100.0,
+                            "payment_method": data.get("channel", "online_paystack"),
+                            "notes": f"Paystack Ref: {reference} | Email: {data.get('customer', {}).get('email')}",
+                            "payment_date": str(date.today()),
+                            "status": "paid"
+                        }
+                        if user_id: payload["user_id"] = user_id
+                        if user_email: payload["user_email"] = user_email
 
-                    sb.table("payments").insert(payload).execute()
-
-                    clear_cache()
-                    st.success(f"✅ Rent Payment of {fmt_money(data['amount']/100, data.get('currency'))} verified and credited!")
+                        sb.table("payments").insert(payload).execute()
+                        clear_cache()
+                        st.toast(f"✅ Rent Payment credited!", icon="💳")
+                        st.success(f"✅ Rent Payment of {fmt_money(data['amount']/100, data.get('currency'))} verified and credited!")
                 except Exception as e:
+                    logger.error(f"Error logging payment reference '{reference}': {e}", exc_info=True)
                     st.error(f"Error logging payment to database: {e}")
             else:
                 st.error("❌ Payment verification failed or transaction was cancelled.")
+
+    # Always clear URL query parameters after processing
+    try:
         st.query_params.clear()
+    except Exception:
+        pass
 
 
 # Trigger callback verification globally
