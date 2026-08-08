@@ -15,6 +15,7 @@ from services.pdf_generator import generate_receipt_pdf
 from services.alerts import render_overdue_alerts_widget
 from components.kyc import render_id_verification_widget
 from components.chat import render_chat_interface
+from components.property_condition import render_landlord_condition_upload_widget
 from ui.pages_core import header
 
 logger = logging.getLogger("RentMaster")
@@ -83,6 +84,10 @@ def page_properties():
                         sb.table("properties").delete().eq("id", p["id"]).execute()
                         clear_cache()
                         st.rerun()
+
+            # INTEGRATED: Pre-Move-In Property Condition & Photos Management Portal
+            with st.expander("📸 Property Pre-Move-In Condition Photos & Report", expanded=False):
+                render_landlord_condition_upload_widget(property_id=p["id"])
 
 
 def page_landlords():
@@ -309,9 +314,6 @@ def page_payments():
                                 st.caption("PDF Error")
 
 
-# ---------------------------------------------------------------------------
-# FULL LEASES & TENANCY AGREEMENTS PORTAL
-# ---------------------------------------------------------------------------
 def page_leases():
     header()
     st.subheader("Leases & Tenancy Agreements")
@@ -388,9 +390,6 @@ def page_leases():
                         st.rerun()
 
 
-# ---------------------------------------------------------------------------
-# FULL MAINTENANCE & TICKET CENTER PORTAL
-# ---------------------------------------------------------------------------
 def page_maintenance():
     header()
     st.subheader("Maintenance Requests & Ticket Center")
@@ -447,7 +446,7 @@ def page_maintenance():
 
     for m in requests_list:
         with st.container(border=True):
-            col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
+            col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 1])
             with col1:
                 st.markdown(f"**{m.get('title', 'Untitled')}**")
                 if m.get("description"):
