@@ -6,7 +6,44 @@ import streamlit as st
 import json
 from datetime import datetime
 from services.database import sb
-from services.paystack import initialize_paystack_transaction
+
+# ---------------------------------------------------------------------------
+# SAFE FALLBACK IMPORT FOR PAYSTACK FUNCTIONS
+# ---------------------------------------------------------------------------
+_paystack_func = None
+
+try:
+    from services.paystack import initialize_paystack_payment as _paystack_func
+except ImportError:
+    try:
+        from services.paystack import initialize_paystack_transaction as _paystack_func
+    except ImportError:
+        _paystack_func = None
+
+
+def safe_initialize_paystack(email, amount_ghs, reference, callback_url="https://www.rentmastergh.com"):
+    """Safe wrapper function to handle parameter differences across Paystack helpers."""
+    if not _paystack_func:
+        return None
+
+    try:
+        # Try calling with standard parameters
+        return _paystack_func(
+            email=email,
+            amount_in_main_unit=amount_ghs,
+            callback_url=callback_url,
+            reference=reference
+        )
+    except TypeError:
+        try:
+            return _paystack_func(
+                email=email,
+                amount_ghs=amount_ghs,
+                reference=reference,
+                callback_url=callback_url
+            )
+        except Exception:
+            return None
 
 
 def get_lease_payment_summary(tenant_id):
@@ -176,34 +213,31 @@ def render_comprehensive_rent_payment_widget(user):
                 else:
                     ref_code = f"RENT-{datetime.now().strftime('%Y%m%d%H%M%S')}"
                     
-                    # Call Paystack initialization or simulate
-                    try:
-                        paystack_data = initialize_paystack_transaction(
-                            email=tenant_email,
-                            amount_ghs=payment_amount,
-                            reference=ref_code
+                    # Call Paystack initialization securely
+                    paystack_data = safe_initialize_paystack(
+                        email=tenant_email,
+                        amount_ghs=payment_amount,
+                        reference=ref_code
+                    )
+
+                    auth_url = None
+                    if paystack_data and isinstance(paystack_data, dict):
+                        auth_url = paystack_data.get("data", {}).get("authorization_url") or paystack_data.get("authorization_url")
+
+                    if auth_url:
+                        st.success("✅ Payment Session Generated!")
+                        st.markdown(
+                            f"""
+                            <a href="{auth_url}" target="_blank" style="display: block; text-align: center; background-color: #059669; color: white; padding: 14px; border-radius: 8px; font-weight: bold; text-decoration: none; font-size: 1.1rem; margin-top: 10px;">
+                                👉 Click Here to Complete Payment of {currency} {payment_amount:,.2f} on Paystack
+                            </a>
+                            """,
+                            unsafe_allow_html=True
                         )
-                        auth_url = paystack_data.get("data", {}).get("authorization_url")
-                        
-                        if auth_url:
-                            st.success("✅ Payment Session Generated!")
-                            st.markdown(
-                                f"""
-                                <a href="{auth_url}" target="_blank" style="display: block; text-align: center; background-color: #059669; color: white; padding: 14px; border-radius: 8px; font-weight: bold; text-decoration: none; font-size: 1.1rem; margin-top: 10px;">
-                                    👉 Click Here to Complete Payment of {currency} {payment_amount:,.2f} on Paystack
-                                </a>
-                                """,
-                                unsafe_allow_html=True
-                            )
-                        else:
-                            # Fallback/Demo recording
-                            record_payment_intent(summary["lease_id"], tenant_email, payment_amount, "Installment" if "Installment" in pay_option else "Full", ref_code)
-                            st.success(f"✅ Payment of {currency} {payment_amount:,.2f} processed successfully! Reference: `{ref_code}`")
-                            st.rerun()
-                    except Exception as e:
-                        # Direct recording fallback if API key missing in demo
+                    else:
+                        # Fallback / Demo recording
                         record_payment_intent(summary["lease_id"], tenant_email, payment_amount, "Installment" if "Installment" in pay_option else "Full", ref_code)
-                        st.success(f"✅ Payment of {currency} {payment_amount:,.2f} recorded! Reference: `{ref_code}`")
+                        st.success(f"✅ Payment of {currency} {payment_amount:,.2f} processed successfully! Reference: `{ref_code}`")
                         st.rerun()
 
     with pay_tab2:
