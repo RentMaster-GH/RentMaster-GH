@@ -16,6 +16,7 @@ from services.alerts import render_overdue_alerts_widget
 from components.kyc import render_id_verification_widget
 from components.chat import render_chat_interface
 from components.property_condition import render_landlord_condition_upload_widget
+from components.agreements import render_landlord_agreement_creator_widget
 from ui.pages_core import header
 
 logger = logging.getLogger("RentMaster")
@@ -85,7 +86,7 @@ def page_properties():
                         clear_cache()
                         st.rerun()
 
-            # INTEGRATED: Pre-Move-In Property Condition & Photos Management Portal
+            # Pre-Move-In Property Condition & Photos Management Portal
             with st.expander("📸 Property Pre-Move-In Condition Photos & Report", expanded=False):
                 render_landlord_condition_upload_widget(property_id=p["id"])
 
@@ -388,6 +389,10 @@ def page_leases():
                         sb.table("leases").delete().eq("id", l["id"]).execute()
                         clear_cache()
                         st.rerun()
+
+            # INTEGRATED: Landlord Tenancy Agreement Manager (Default, Typed Custom, or PDF Upload)
+            with st.expander("📜 Manage / Issue Tenancy Agreement", expanded=False):
+                render_landlord_agreement_creator_widget(lease_id=l["id"])
 
 
 def page_maintenance():
