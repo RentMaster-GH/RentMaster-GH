@@ -3,6 +3,7 @@ import streamlit as st
 from services.helpers import fmt_money, fmt_date, compute_tenant_ledger, prop_label, get_active_user_info
 from services.database import sb, fetch_tenant_profile_by_email, fetch_payments, fetch_maintenance, clear_cache
 from services.paystack import initialize_paystack_payment
+from components.chat import render_chat_interface
 from ui.pages_core import header
 
 
@@ -40,11 +41,12 @@ def render_tenant_portal():
             bal_label = "Outstanding Due" if ledger["balance"] > 0 else "Up to Date"
             st.metric("Ledger Balance", fmt_money(abs(ledger["balance"])), delta=f":{bal_color}[{bal_label}]")
 
-    # Portal Tabs
-    tab_pay, tab_docs, tab_maint = st.tabs([
+    # Portal Tabs (All 4 Tabs Defined Cleanly Together)
+    tab_pay, tab_docs, tab_maint, tab_chat = st.tabs([
         "💳 Rent Ledger & Pay Online",
         "📋 Official Rent Documents & Rent Card",
-        "🛠️ Repair & Maintenance Requests"
+        "🛠️ Repair & Maintenance Requests",
+        "💬 Chat & Video Call Landlord"
     ])
 
     # TAB 1: RENT LEDGER & ONLINE CHECKOUT
@@ -159,3 +161,14 @@ def render_tenant_portal():
                         st.write(m["description"])
         else:
             st.info("No active maintenance requests filed for your unit.")
+
+    # TAB 4: CHAT & VIDEO CALL LANDLORD
+    with tab_chat:
+        landlord_name = landlord_obj.get("name", "Landlord") if isinstance(landlord_obj, dict) else "Landlord"
+        render_chat_interface(
+            tenant_id=tenant.get("id"),
+            current_user_id=user_id,
+            current_user_role="tenant",
+            current_user_email=user_email,
+            recipient_name=landlord_name
+        )
