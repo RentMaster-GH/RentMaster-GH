@@ -44,16 +44,6 @@ from ui.pages_management import (
 from ui.tenant_portal import render_tenant_portal
 from ui.sponsor_portal import render_sponsor_portal, show_sponsor_support_dialog
 
-# ---------------------------------------------------------------------------
-# Streamlit Config (MUST BE FIRST)
-# ---------------------------------------------------------------------------
-st.set_page_config(
-    page_title="RentMaster-GH | Rental Property Management System",
-    page_icon="🏠",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
 # Cookie Manager Instance
 try:
     cookie_manager = stx.CookieManager(key="rentmaster_cookie_mgr")
@@ -383,7 +373,7 @@ if st.session_state.get("user") is None:
 
 
 # ---------------------------------------------------------------------------
-# STRICT ROLE-BASED NAVIGATION ROUTER (NO TENANT PORTAL IN LANDLORD VIEW)
+# STRICT ROLE-BASED NAVIGATION ROUTER
 # ---------------------------------------------------------------------------
 active_user = st.session_state.get("user")
 user_role = get_user_role(active_user)
@@ -391,18 +381,18 @@ user_role = get_user_role(active_user)
 # Strictly define allowed navigation items per role
 if user_role == "tenant":
     PAGES = {
-        "Tenant Portal": render_tenant_portal,
+        "Tenant Portal": render_tenant_portal,   # TENANT PORTAL IS ONLY HERE
         "User Profile": page_user_profile,
         "Settings": page_settings,
         "Sponsor Portal": render_sponsor_portal,
     }
-else:  # Landlord / Property Manager (TENANT PORTAL EXCLUDED HERE)
+else:  # Landlord / Property Manager View (TENANT PORTAL STRICTLY EXCLUDED)
     PAGES = {
         "Dashboard": page_dashboard,
         "User Profile": page_user_profile,
         "Properties": page_properties,
         "Landlords": page_landlords,
-        "Tenants": page_tenants,
+        "Tenants": page_tenants,                 # Management view of tenants
         "Payments": page_payments,
         "Leases": page_leases,
         "Maintenance": page_maintenance,
