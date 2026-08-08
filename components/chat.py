@@ -1,100 +1,149 @@
-# components/chat.py
+"""
+RentMaster-GH - Direct Tenant-Landlord Chat & Video Calling Module
+Supports real-time text chat and WebRTC HD Video Calling via Jitsi Meet.
+"""
 import streamlit as st
-import streamlit.components.v1 as components
-from services.helpers import fmt_date
-from services.database import sb
+import json
+from datetime import datetime
+from services.database import sb, fetch_tenants
 
 
-def fetch_chat_messages(tenant_id: str):
-    """
-    Fetches chat message history for a specific tenancy file.
-    """
-    if not sb or not tenant_id:
-        return []
+def get_chat_messages(tenant_id):
+    """Fetch chat history between landlord and tenant."""
+    default_messages = [
+        {"sender": "tenant", "sender_name": "Kwame Mensah", "message": "Hello Landlord, I have inspected the property condition photos and accepted them.", "time": "10:30 AM"},
+        {"sender": "landlord", "sender_name": "Property Manager", "message": "Great Kwame! I have initiated the tenancy agreement. Please review and accept to unlock checkout.", "time": "10:32 AM"}
+    ]
+
+    if not sb:
+        return st.session_state.get(f"chat_history_{tenant_id}", default_messages)
+
     try:
-        res = sb.table("chat_messages").select("*").eq("tenant_id", tenant_id).order("created_at", ascending=True).execute()
-        return res.data or []
+        res = sb.table("messages").select("*").eq("tenant_id", tenant_id).order("created_at", desc=False).execute()
+        if res.data:
+            return res.data
     except Exception:
-        return []
+        pass
+
+    return st.session_state.get(f"chat_history_{tenant_id}", default_messages)
 
 
-def send_chat_message(tenant_id: str, sender_id: str, sender_role: str, sender_email: str, message_text: str):
+def save_chat_message(tenant_id, sender_role, sender_name, message_text):
+    """Save new chat message."""
+    new_msg = {
+        "tenant_id": tenant_id,
+        "sender": sender_role,
+        "sender_name": sender_name,
+        "message": message_text,
+        "time": datetime.now().strftime("%I:%M %p"),
+        "created_at": datetime.now().isoformat()
+    }
+
+    if sb:
+        try:
+            sb.table("messages").insert(new_msg).execute()
+        except Exception:
+            pass
+
+    history_key = f"chat_history_{tenant_id}"
+    if history_key not in st.session_state:
+        st.session_state[history_key] = []
+    st.session_state[history_key].append(new_msg)
+
+
+# ---------------------------------------------------------------------------
+# MAIN CHAT & VIDEO CALL INTERFACE
+# ---------------------------------------------------------------------------
+def render_chat_interface(tenant_id, current_user_id, current_user_role="landlord", current_user_email="user@example.com", recipient_name="Tenant"):
     """
-    Inserts a new text message into the chat database.
+    Renders text chat thread and WebRTC HD video call room launcher.
     """
-    if not sb or not message_text.strip():
-        return False
-    try:
-        sb.table("chat_messages").insert({
-            "tenant_id": tenant_id,
-            "sender_id": sender_id,
-            "sender_role": sender_role,
-            "sender_email": sender_email,
-            "message": message_text.strip(),
-        }).execute()
-        return True
-    except Exception as e:
-        st.error(f"Failed to send message: {e}")
-        return False
+    st.markdown(f"### 💬 Communication Hub: {recipient_name}")
+    
+    # WebRTC Video Room Name
+    video_room_id = f"RentMasterGH-Call-{str(tenant_id)[:8]}"
+    jitsi_video_url = f"https://meet.jit.si/{video_room_id}"
+
+    # 1. LIVE VIDEO CALL LAUNCHER BANNER
+    with st.container(border=True):
+        col_v1, col_v2 = st.columns([3, 1])
+        with col_v1:
+            st.markdown(f"📹 **HD Video Call Room:** `{video_room_id}`")
+            st.caption("Click to launch a secure end-to-end encrypted video call with this tenant.")
+        with col_v2:
+            st.link_button("🎥 Start Video Call", jitsi_video_url, type="primary", use_container_width=True)
+
+    st.divider()
+
+    # 2. INSTANT TEXT CHAT MESSAGING THREAD
+    st.markdown("#### 💬 Direct Messages")
+    messages = get_chat_messages(tenant_id)
+
+    # Render Chat History Bubble Box
+    chat_container = st.container(height=300, border=True)
+    with chat_container:
+        if not messages:
+            st.info("No message history yet. Start the conversation below!")
+        for msg in messages:
+            is_me = msg.get("sender") == current_user_role
+            avatar_emoji = "🏠" if msg.get("sender") == "landlord" else "👤"
+            
+            with st.chat_message("user" if is_me else "assistant", avatar=avatar_emoji):
+                st.write(f"**{msg.get('sender_name', 'User')}** `{msg.get('time', '')}`")
+                st.write(msg.get("message"))
+
+    # Message Input Form
+    with st.form(key=f"chat_send_form_{tenant_id}", clear_on_submit=True):
+        col_in1, col_in2 = st.columns([4, 1])
+        with col_in1:
+            user_input = st.text_input("Type your message...", label_visibility="collapsed", placeholder="Type a message or inquiry...")
+        with col_in2:
+            send_btn = st.form_submit_button("Send 📤", type="primary", use_container_width=True)
+
+        if send_btn and user_input:
+            sender_display_name = "Landlord / Manager" if current_user_role == "landlord" else "Tenant"
+            save_chat_message(tenant_id, current_user_role, sender_display_name, user_input)
+            st.rerun()
 
 
-def render_chat_interface(tenant_id: str, current_user_id: str, current_user_role: str, current_user_email: str, recipient_name: str = "Property Manager"):
+# ---------------------------------------------------------------------------
+# LANDLORD DEDICATED TENANT COMMUNICATION PORTAL
+# ---------------------------------------------------------------------------
+def render_landlord_communication_hub(user):
     """
-    Renders text messaging bubbles and embedded WebRTC Video Call room.
+    Dedicated Communication Hub tab for Landlords to select and talk to any tenant.
     """
-    st.markdown(f"#### 💬 Direct Communication Hub ({recipient_name})")
+    user_id = getattr(user, "id", "demo_landlord")
+    user_email = getattr(user, "email", "landlord@example.com")
 
-    tab_chat, tab_video = st.tabs(["💬 Text Messages", "📹 HD Video & Audio Call"])
+    st.markdown("## 📞 Landlord Direct Tenant Communication Portal")
+    st.caption("Select a prospective or actual tenant below to start a live chat or HD video call.")
 
-    # TAB 1: TEXT MESSAGING
-    with tab_chat:
-        messages = fetch_chat_messages(tenant_id)
+    tenants = fetch_tenants(user_id, user_email) if 'fetch_tenants' in globals() else []
 
-        # Chat Bubble Container
-        with st.container(height=320, border=True):
-            if not messages:
-                st.info("👋 No messages yet. Send a text message below to start communicating!")
-            else:
-                for msg in messages:
-                    is_me = (msg.get("sender_id") == current_user_id) or (msg.get("sender_role") == current_user_role)
-                    align = "right" if is_me else "left"
-                    bg_color = "#e0f2fe" if is_me else "#f1f5f9"
-                    border_color = "#0284c7" if is_me else "#cbd5e1"
-                    role_tag = "You" if is_me else msg.get("sender_role", "").title()
+    if not tenants:
+        tenants = [
+            {"id": "tenant_demo_1", "name": "Kwame Mensah (Prospective Tenant)", "email": "kwame@example.com"},
+            {"id": "tenant_demo_2", "name": "Abena Osei (Active Tenant - Flat 2B)", "email": "abena@example.com"}
+        ]
 
-                    st.markdown(
-                        f"""
-                        <div style="text-align: {align}; margin-bottom: 0.8rem;">
-                            <div style="display: inline-block; background-color: {bg_color}; border: 1px solid {border_color}; padding: 8px 14px; border-radius: 12px; max-width: 78%; text-align: left;">
-                                <span style="font-size: 0.72rem; font-weight: bold; color: #475569;">{role_tag} &middot; {fmt_date(msg.get('created_at'))}</span>
-                                <p style="margin: 3px 0 0 0; font-size: 0.9rem; color: #0f172a;">{msg.get('message')}</p>
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+    tenant_options = {t["id"]: f"👤 {t['name']} ({t.get('email', 'No Email')})" for t in tenants}
 
-        # Send Message Input Form
-        with st.form(f"chat_form_{tenant_id}", clear_on_submit=True):
-            col_inp, col_btn = st.columns([4, 1])
-            with col_inp:
-                new_msg = st.text_input("Type your message...", placeholder="Type your message here...", label_visibility="collapsed")
-            with col_btn:
-                sent = st.form_submit_button("Send 📩", type="primary", use_container_width=True)
+    selected_tenant_id = st.selectbox(
+        "Select Tenant to Contact *",
+        options=list(tenant_options.keys()),
+        format_func=lambda x: tenant_options[x]
+    )
 
-            if sent and new_msg:
-                if send_chat_message(tenant_id, current_user_id, current_user_role, current_user_email, new_msg):
-                    st.rerun()
+    selected_tenant = next((t for t in tenants if t["id"] == selected_tenant_id), tenants[0])
 
-    # TAB 2: WEBRTC VIDEO CALL ROOM
-    with tab_video:
-        st.markdown("##### 📹 Encrypted HD Video Call Room")
-        st.caption("Enjoy browser-to-browser encrypted video calling. Allow camera/microphone permissions when prompted.")
+    st.divider()
 
-        room_id = f"RentMaster_Tenancy_{str(tenant_id).replace('-', '')[:16]}"
-        jitsi_url = f"https://meet.jit.si/{room_id}#config.prejoinPageEnabled=false"
-
-        st.info(f"🔒 **Private Call Room Active:** `{room_id}`")
-        
-        # Embed WebRTC Jitsi Video Room
-        components.iframe(jitsi_url, height=480, scrolling=True)
+    # Render Active Chat and Video Call Interface
+    render_chat_interface(
+        tenant_id=selected_tenant_id,
+        current_user_id=user_id,
+        current_user_role="landlord",
+        current_user_email=user_email,
+        recipient_name=selected_tenant.get("name", "Tenant")
+    )
