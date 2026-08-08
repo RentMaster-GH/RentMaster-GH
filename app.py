@@ -153,7 +153,9 @@ def auth_page():
                 text-decoration: none;
                 font-size: 0.9rem;
             }
-            div[data-testid="stButton"] button:has(p:contains("Launch Advert")) {
+            div[data-testid="stButton"] button:has(p:contains("Launch Advert")),
+            div[data-testid="stButton"] button:has(span:contains("Launch Advert")),
+            div[data-testid="stButton"] button:has(div:contains("Launch Advert")) {
                 background-color: #16a34a !important;
                 border-color: #16a34a !important;
                 color: #ffffff !important;
@@ -366,24 +368,23 @@ if st.session_state.get("user") is None:
 
 
 # ---------------------------------------------------------------------------
-# STRICT ROLE-BASED NAVIGATION ROUTER
+# STRICT ROLE-BASED NAVIGATION ROUTER (SPONSOR PORTAL AT THE VERY END)
 # ---------------------------------------------------------------------------
 active_user = st.session_state.get("user")
 user_role = get_user_role(active_user)
 
-# Strictly define allowed navigation items per role
+# Strictly define allowed navigation items per role (SPONSOR PORTAL IS LAST)
 if user_role == "tenant":
     PAGES = {
         "Tenant Portal": render_tenant_portal,
-        "Sponsor Portal": render_sponsor_portal,
         "User Profile": page_user_profile,
         "Settings": page_settings,
+        "Sponsor Portal": render_sponsor_portal,  # <-- LAST ITEM
     }
 else:  # Landlord / Property Manager
     PAGES = {
         "Dashboard": page_dashboard,
         "Tenant Portal": render_tenant_portal,
-        "Sponsor Portal": render_sponsor_portal,
         "User Profile": page_user_profile,
         "Properties": page_properties,
         "Landlords": page_landlords,
@@ -392,6 +393,7 @@ else:  # Landlord / Property Manager
         "Leases": page_leases,
         "Maintenance": page_maintenance,
         "Settings": page_settings,
+        "Sponsor Portal": render_sponsor_portal,  # <-- LAST ITEM
     }
 
 # Auto-set default page if none selected or invalid for current role
@@ -406,7 +408,7 @@ with st.sidebar:
     selection = st.radio("Go to", nav_keys, index=default_index)
     st.session_state["current_page"] = selection
 
-    # 1-CLICK ROLE VIEW SWITCHER (FOR TESTING & DUAL-ROLE USERS)
+    # 1-CLICK ROLE VIEW SWITCHER
     st.markdown("---")
     st.caption("🔄 Switch View Mode")
     target_switch = "landlord" if user_role == "tenant" else "tenant"
