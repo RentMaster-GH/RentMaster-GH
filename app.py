@@ -381,18 +381,17 @@ user_role = get_user_role(active_user)
 # Strictly define allowed navigation items per role
 if user_role == "tenant":
     PAGES = {
-        "Tenant Portal": render_tenant_portal,   # TENANT PORTAL IS ONLY HERE
+        "Tenant Portal": render_tenant_portal,
         "User Profile": page_user_profile,
         "Settings": page_settings,
         "Sponsor Portal": render_sponsor_portal,
     }
-else:  # Landlord / Property Manager View (TENANT PORTAL STRICTLY EXCLUDED)
+else:  # Landlord / Property Manager View ('Tenants' and 'Tenant Portal' EXCLUDED HERE)
     PAGES = {
         "Dashboard": page_dashboard,
         "User Profile": page_user_profile,
         "Properties": page_properties,
         "Landlords": page_landlords,
-        "Tenants": page_tenants,                 # Management view of tenants
         "Payments": page_payments,
         "Leases": page_leases,
         "Maintenance": page_maintenance,
