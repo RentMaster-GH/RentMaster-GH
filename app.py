@@ -12,6 +12,10 @@ from services.helpers import inject_google_analytics, inject_google_site_verific
 from services.database import sb, clear_cache
 from services.paystack import handle_paystack_callbacks
 from components.ads import render_public_ad_banners
+from components.public_showcase import (
+    render_public_featured_properties,
+    show_public_property_listing_dialog
+)
 from ui.pages_core import (
     header, show_support_dialog, page_dashboard,
     page_user_profile, page_settings
@@ -310,19 +314,22 @@ def auth_page():
                         except Exception as e:
                             st.error(f"Sign Up Error: {e}")
 
-    # RIGHT COLUMN: SPONSOR SELF-SERVICE & PLATFORM SHOWCASE
+    # RIGHT COLUMN: SPONSOR SELF-SERVICE, PROPERTY LISTING & PLATFORM SHOWCASE
     with ad_showcase_col:
-        # Self-Service Sponsor Actions Card
+        # Self-Service Actions Card
         with st.container(border=True):
-            st.markdown("#### 📢 Advertise With Us")
-            st.caption("Promote your business directly to property owners, landlords, and tenants across Ghana & West Africa.")
+            st.markdown("#### 📢 Promote & List Properties")
+            st.caption("Promote your business or list your vacant property for rent (GH₵ 50 / $5) to visitors across Ghana.")
             
-            c_btn1, c_btn2 = st.columns(2)
+            c_btn1, c_btn2, c_btn3 = st.columns(3)
             with c_btn1:
                 if st.button("🚀 Launch Advert", use_container_width=True, type="primary"):
                     show_public_sponsor_launch_dialog()
             with c_btn2:
-                if st.button("💬 Contact Manager", use_container_width=True, type="secondary"):
+                if st.button("🏠 List Property", use_container_width=True, type="secondary"):
+                    show_public_property_listing_dialog()
+            with c_btn3:
+                if st.button("💬 Manager", use_container_width=True, type="secondary"):
                     show_sponsor_support_dialog()
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -348,6 +355,9 @@ def auth_page():
 
         # Render Active Sponsor Banners
         render_public_ad_banners(ad_slot="Login Page Sidebar Banner")
+
+    # RENDER PUBLIC FEATURED PROPERTY SHOWCASE AT BOTTOM OF AUTH SCREEN
+    render_public_featured_properties()
 
     # TRUST & SECURITY BADGES BAR
     st.markdown(
