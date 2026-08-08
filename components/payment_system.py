@@ -6,6 +6,7 @@ import streamlit as st
 import json
 from datetime import datetime
 from services.database import sb
+from components.property_condition import render_tenant_condition_approval_widget
 
 # ---------------------------------------------------------------------------
 # SAFE FALLBACK IMPORT FOR PAYSTACK FUNCTIONS
@@ -27,7 +28,6 @@ def safe_initialize_paystack(email, amount_ghs, reference, callback_url="https:/
         return None
 
     try:
-        # Try calling with standard parameters
         return _paystack_func(
             email=email,
             amount_in_main_unit=amount_ghs,
@@ -52,8 +52,8 @@ def get_lease_payment_summary(tenant_id):
         "lease_id": "lease_demo_101",
         "property_name": "East Legon Executive Apartment #4B",
         "landlord_name": "Chief Kwame Appiah",
-        "total_rent": 12000.00,  # e.g., GH₵ 12,000 / year
-        "amount_paid": 4000.00,  # e.g., GH₵ 4,000 paid so far
+        "total_rent": 12000.00,
+        "amount_paid": 4000.00,
         "currency": "GHS",
         "installment_plan_allowed": True,
         "min_installment": 500.00,
@@ -70,7 +70,6 @@ def get_lease_payment_summary(tenant_id):
         res = sb.table("leases").select("*, properties(title), landlords(name)").eq("tenant_id", tenant_id).execute()
         if res.data:
             lease = res.data[0]
-            # Fetch payments
             pay_res = sb.table("payments").select("*").eq("lease_id", lease["id"]).execute()
             history = pay_res.data or []
             
@@ -111,7 +110,6 @@ def record_payment_intent(lease_id, tenant_email, amount, payment_type, ref):
         except Exception:
             pass
 
-    # Update session cache
     cache_key = f"lease_summary_{tenant_email}"
     if cache_key in st.session_state:
         st.session_state[cache_key]["amount_paid"] += amount
@@ -123,6 +121,17 @@ def record_payment_intent(lease_id, tenant_email, amount, payment_type, ref):
 # ---------------------------------------------------------------------------
 def render_comprehensive_rent_payment_widget(user):
     """Renders the Full / Installment Payment UI for Tenants."""
+    
+    # 1. PRE-PAYMENT CHECK: Property Condition Inspection & Acceptance
+    condition_approved = render_tenant_condition_approval_widget(user)
+
+    st.divider()
+
+    # Lock payment form if tenant has not accepted property condition photos
+    if not condition_approved:
+        st.info("🔒 **Rent Payments Locked:** Please inspect and accept the property condition photos above to unlock the payment checkout form.")
+        return
+
     st.markdown("## 💳 Rent Payment & Installment Center")
     st.caption("Pay your rent safely via Mobile Money (MTN, Telecel, AT) or Bank Card.")
 
@@ -156,7 +165,6 @@ def render_comprehensive_rent_payment_widget(user):
 
     st.divider()
 
-    # If rent fully paid, show success
     if remaining_balance <= 0:
         st.balloons()
         st.success("🎉 **Congratulations! Your rent for this lease period is fully settled.**")
@@ -198,7 +206,6 @@ def render_comprehensive_rent_payment_widget(user):
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # Payment Gateway Selection
             gateway = st.radio("Select Payment Channel *", ["📱 Mobile Money (MTN / Telecel / AT)", "💳 Debit / Credit Card"], horizontal=True)
 
             pay_now_btn = st.button(
@@ -213,7 +220,6 @@ def render_comprehensive_rent_payment_widget(user):
                 else:
                     ref_code = f"RENT-{datetime.now().strftime('%Y%m%d%H%M%S')}"
                     
-                    # Call Paystack initialization securely
                     paystack_data = safe_initialize_paystack(
                         email=tenant_email,
                         amount_ghs=payment_amount,
@@ -235,7 +241,6 @@ def render_comprehensive_rent_payment_widget(user):
                             unsafe_allow_html=True
                         )
                     else:
-                        # Fallback / Demo recording
                         record_payment_intent(summary["lease_id"], tenant_email, payment_amount, "Installment" if "Installment" in pay_option else "Full", ref_code)
                         st.success(f"✅ Payment of {currency} {payment_amount:,.2f} processed successfully! Reference: `{ref_code}`")
                         st.rerun()
@@ -252,7 +257,6 @@ def _render_payment_history_table(history, currency):
         st.info("No payment records found for this lease yet.")
         return
 
-    # Render History Table
     for idx, p in enumerate(reversed(history)):
         with st.container(border=True):
             col_a, col_b, col_c = st.columns([2, 2, 1])
@@ -264,6 +268,5 @@ def _render_payment_history_table(history, currency):
                 st.caption(f"Ref: `{p.get('reference', 'N/A')}`")
             with col_c:
                 st.success("Completed ✅")
-                # Printable Receipt Trigger
                 if st.button("📄 Receipt", key=f"rcpt_btn_{idx}"):
                     st.toast(f"Downloading PDF Receipt for Ref: {p.get('reference')}")
