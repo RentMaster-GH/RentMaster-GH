@@ -6,6 +6,57 @@ from services.database import fetch_ads, sb, clear_cache
 from services.paystack import initialize_ad_payment
 
 
+def render_public_ad_banners(ad_slot: str = None):
+    """
+    Renders active, paid sponsor banners subtly for visitors and logged-in users.
+    Only displays banners with 'paid' or 'active' payment status.
+    """
+    try:
+        ads = fetch_ads()
+        active_ads = [
+            a for a in ads
+            if isinstance(a, dict)
+            and a.get("status") in ("paid", "active")
+            and (ad_slot is None or a.get("ad_slot") == ad_slot or "Login" in str(a.get("ad_slot")))
+        ]
+    except Exception:
+        active_ads = []
+
+    if not active_ads:
+        # Default placeholder when no paid ads exist
+        with st.container(border=True):
+            st.markdown("##### 🤝 Become a RentMaster Sponsor")
+            st.caption("Reach thousands of property owners, landlords, and tenants in Ghana and across West Africa.")
+            st.markdown(
+                """
+                * 📍 High-visibility sidebar & header slots
+                * 💳 Instant Paystack activation
+                * 📊 Real-time impression tracking
+                """
+            )
+        return
+
+    st.markdown(
+        """
+        <div style="margin-top: 0.5rem; margin-bottom: 0.8rem;">
+            <span style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">Verified Platform Sponsors</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    for ad in active_ads:
+        with st.container(border=True):
+            if ad.get("creative_url"):
+                st.image(ad.get("creative_url"), use_container_width=True)
+            
+            st.markdown(f"**{ad.get('business_name', 'Featured Partner')}**")
+            st.caption("Official RentMaster Partner")
+            
+            if ad.get("destination_url"):
+                st.link_button("🌐 Visit Sponsor Website", ad.get("destination_url"), use_container_width=True)
+
+
 def render_ad_space_management(key_prefix: str = "ad"):
     st.markdown("#### Paid Advertisements & Ad Space Management")
     st.caption("Manage sponsor banners, advertiser campaigns, and paid placements across tenant/landlord portals.")
