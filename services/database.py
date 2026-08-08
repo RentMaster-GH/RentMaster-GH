@@ -137,3 +137,27 @@ def upload_id_to_supabase(file_obj, identifier: str, folder: str = "tenants"):
         logger.error(f"Storage Upload Failed: {e}")
         st.error(f"Failed to upload document: {e}")
         return None
+
+@st.cache_data(ttl=10)
+def fetch_tenant_profile_by_email(email: str):
+    """
+    Fetches the tenant record linked to the logged-in user's email.
+    """
+    if not sb or not email:
+        return None
+    try:
+        r = sb.table("tenants").select("*, properties(*, landlords(*))").eq("email", email).order("created_at", desc=True).limit(1).execute()
+        return r.data[0] if r.data else None
+    except Exception as e:
+        logger.error(f"Error fetching tenant profile for {email}: {e}")
+        return None
+
+def clear_cache():
+    fetch_properties.clear()
+    fetch_landlords.clear()
+    fetch_tenants.clear()
+    fetch_payments.clear()
+    fetch_leases.clear()
+    fetch_maintenance.clear()
+    fetch_ads.clear()
+    fetch_tenant_profile_by_email.clear()  # <-- ADD THIS LINE
