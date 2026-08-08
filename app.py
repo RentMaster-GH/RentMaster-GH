@@ -21,6 +21,7 @@ from ui.pages_management import (
     page_payments, page_leases, page_maintenance
 )
 from ui.tenant_portal import render_tenant_portal
+from ui.sponsor_portal import render_sponsor_portal, show_sponsor_support_dialog
 
 # ---------------------------------------------------------------------------
 # Streamlit Config (MUST BE FIRST)
@@ -80,6 +81,14 @@ if sb and "code" in st.query_params:
             st.rerun()
     except Exception:
         pass
+
+
+# ---------------------------------------------------------------------------
+# Public Sponsor Dialog (Callable directly from Auth Screen)
+# ---------------------------------------------------------------------------
+@st.dialog("📢 Self-Service Sponsor & Advertiser Hub", width="large")
+def show_public_sponsor_launch_dialog():
+    render_sponsor_portal()
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +191,7 @@ def auth_page():
         unsafe_allow_html=True
     )
 
-    # 2-COLUMN LAYOUT: Auth Form (Left 1.2) + Partner Showcase (Right 1.0)
+    # 2-COLUMN LAYOUT: Auth Form (Left 1.2) + Sponsor & Partner Showcase (Right 1.0)
     login_col, ad_showcase_col = st.columns([1.2, 1], gap="large")
 
     # LEFT COLUMN: AUTHENTICATION CARD
@@ -249,7 +258,7 @@ def auth_page():
                         if res.url:
                             st.markdown(
                                 f"""
-                                <a href="{res.url}" target="_self" style="display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 11px; border: 1px solid #dadce0; border-radius: 8px; background-color: white; color: #3c4043; font-weight: 600; text-decoration: none; box-sizing: border-box; font-size: 0.92rem; shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                <a href="{res.url}" target="_self" style="display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 11px; border: 1px solid #dadce0; border-radius: 8px; background-color: white; color: #3c4043; font-weight: 600; text-decoration: none; box-sizing: border-box; font-size: 0.92rem;">
                                     <img src="https://www.gstatic.com/images/branding/product/1x/gsa_64dp.png" width="18" height="18"> Continue with Google
                                 </a>
                                 """,
@@ -281,11 +290,26 @@ def auth_page():
                         except Exception as e:
                             st.error(f"Sign Up Error: {e}")
 
-    # RIGHT COLUMN: PLATFORM FEATURES & SPONSOR SHOWCASE
+    # RIGHT COLUMN: SPONSOR SELF-SERVICE & PLATFORM SHOWCASE
     with ad_showcase_col:
-        # Platform Feature Badges
+        # Self-Service Sponsor Actions Card
         with st.container(border=True):
-            st.markdown("#### ⚡ Platform Capabilities")
+            st.markdown("#### 📢 Advertise With Us")
+            st.caption("Promote your business directly to property owners, landlords, and tenants across Ghana & West Africa.")
+            
+            c_btn1, c_btn2 = st.columns(2)
+            with c_btn1:
+                if st.button("🚀 Launch Advert", use_container_width=True, type="primary"):
+                    show_public_sponsor_launch_dialog()
+            with c_btn2:
+                if st.button("💬 Contact Manager", use_container_width=True, type="secondary"):
+                    show_sponsor_support_dialog()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Platform Capabilities Pills
+        with st.container(border=True):
+            st.markdown("#### ⚡ Platform Features")
             st.markdown(
                 """
                 <div style="margin-bottom: 0.5rem;">
@@ -302,9 +326,7 @@ def auth_page():
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Subtle Paid Sponsor Showcase
-        st.markdown("#### 🌟 Featured Partners & Services")
-        st.caption("Services recommended for property managers, landlords, and tenants across Ghana & West Africa.")
+        # Render Active Sponsor Banners
         render_public_ad_banners(ad_slot="Login Page Sidebar Banner")
 
     # TRUST & SECURITY BADGES BAR
@@ -329,6 +351,7 @@ if st.session_state.get("user") is None:
 PAGES = {
     "Dashboard": page_dashboard,
     "Tenant Portal": render_tenant_portal,
+    "Sponsor Portal": render_sponsor_portal,
     "User Profile": page_user_profile,
     "Properties": page_properties,
     "Landlords": page_landlords,
