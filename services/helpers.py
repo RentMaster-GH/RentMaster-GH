@@ -230,16 +230,16 @@ def compute_tenant_ledger(tenant: dict, all_payments: list):
 
 
 # ---------------------------------------------------------------------------
-# Multi-Currency Conversion & Dual Display Helper (ADDED)
+# Multi-Currency Conversion & Dual Display Helper
 # ---------------------------------------------------------------------------
 EXCHANGE_RATES_TO_GHS = {
     "GHS": 1.0,
-    "USD": 15.50,  # 1 USD = ~15.50 GHS
-    "EUR": 16.80,  # 1 EUR = ~16.80 GHS
-    "GBP": 19.80,  # 1 GBP = ~19.80 GHS
-    "NGN": 0.010,  # 1 NGN = ~0.01 GHS
-    "KES": 0.12,   # 1 KES = ~0.12 GHS
-    "ZAR": 0.85,   # 1 ZAR = ~0.85 GHS
+    "USD": 15.50,
+    "EUR": 16.80,
+    "GBP": 19.80,
+    "NGN": 0.010,
+    "KES": 0.12,
+    "ZAR": 0.85,
     "CAD": 11.20,
     "AUD": 10.10,
     "XOF": 0.025,
@@ -249,10 +249,6 @@ EXCHANGE_RATES_TO_GHS = {
 
 
 def convert_and_fmt_money(amount_ghs: float, target_currency: str = None) -> str:
-    """
-    Converts a GHS base amount and formats it with its foreign currency equivalent.
-    e.g. 'GHs 500.00 (approx. $ 32.26 USD)'
-    """
     curr = target_currency or get_current_currency()
     rate = EXCHANGE_RATES_TO_GHS.get(curr, 1.0)
 
@@ -262,6 +258,7 @@ def convert_and_fmt_money(amount_ghs: float, target_currency: str = None) -> str
     else:
         converted_amount = amount_ghs / rate
         return f"{fmt_money(converted_amount, curr)} (approx. {fmt_money(amount_ghs, 'GHS')})"
+
 
 # ---------------------------------------------------------------------------
 # User Role Resolution Helper
@@ -274,7 +271,6 @@ def get_user_role(user) -> str:
     if not user:
         return "landlord"
 
-    # 1. Check metadata set during sign-up
     user_metadata = getattr(user, "user_metadata", {}) or {}
     role = user_metadata.get("role")
     if role in ("tenant", "landlord"):
@@ -284,7 +280,6 @@ def get_user_role(user) -> str:
     if not email:
         return "landlord"
 
-    # 2. Check if user email is linked to an active tenant record
     try:
         from services.database import fetch_tenant_profile_by_email
         tenant_profile = fetch_tenant_profile_by_email(email)
