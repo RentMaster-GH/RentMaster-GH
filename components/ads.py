@@ -23,7 +23,6 @@ def render_public_ad_banners(ad_slot: str = None):
         active_ads = []
 
     if not active_ads:
-        # Default placeholder when no paid ads exist
         with st.container(border=True):
             st.markdown("##### 🤝 Become a RentMaster Sponsor")
             st.caption("Reach thousands of property owners, landlords, and tenants in Ghana and across West Africa.")
