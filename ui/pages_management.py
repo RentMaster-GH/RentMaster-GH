@@ -1,7 +1,7 @@
 # ui/pages_management.py
 import logging
 import streamlit as st
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
 from services.helpers import (
     get_active_user_info, get_current_currency, fmt_money, fmt_date,
     prop_label, tenant_label, compute_tenant_ledger, GLOBAL_PAYOUT_BANKS
@@ -171,7 +171,7 @@ def page_tenants():
     props = fetch_properties(user_id, user_email)
     prop_options = {p["id"]: prop_label(p) for p in props} or {"": "No properties available"}
 
-    # CLEAN ADD TENANT FORM (KYC ID Upload Removed - Managed on Tenant Portal)
+    # CLEAN ADD TENANT FORM
     with st.expander("Add New Tenant", expanded=False):
         with st.form("add_tenant"):
             col1, col2 = st.columns(2)
@@ -221,18 +221,30 @@ def page_tenants():
                     st.markdown(f"Status: **{status}**")
                     
                     v_status = t.get("verification_status", "unverified")
-                    st.caption(f"KYC: `{v_status.upper()}`")
+                    mgr_time_str = t.get("manager_approved_at")
 
-                    # LANDLORD ACCEPTANCE BUTTON
+                    # LANDLORD 2-DAY ACCEPTANCE BADGE & BUTTON
                     if v_status in ["manager_approved", "pending_manager_approval"] and not t.get("landlord_acceptance"):
+                        deadline_text = "48h window active"
+                        if mgr_time_str:
+                            try:
+                                app_time = datetime.fromisoformat(mgr_time_str)
+                                hours_left = max(0, int(((app_time + timedelta(days=2)) - datetime.now()).total_seconds() // 3600))
+                                deadline_text = f"⏰ {hours_left}h left to accept"
+                            except Exception:
+                                pass
+
+                        st.warning(f"🛡️ Manager Approved ({deadline_text})")
                         if st.button("✅ Accept Tenant", key=f"accept_tenant_{t['id']}", type="primary"):
                             if sb:
                                 sb.table("tenants").update({"landlord_acceptance": True}).eq("id", t["id"]).execute()
                                 clear_cache()
-                                st.toast("✅ Tenant Accepted & Admitted to Property!", icon="🤝")
+                                st.toast("✅ Tenant Accepted & Admitted!", icon="🤝")
                                 st.rerun()
                     elif t.get("landlord_acceptance"):
-                        st.caption("✅ Landlord Accepted")
+                        st.success("✅ Landlord Accepted")
+                    else:
+                        st.caption(f"KYC Status: `{v_status.upper()}`")
                 with col4:
                     with st.popover("💬 Chat & Video"):
                         render_chat_interface(
