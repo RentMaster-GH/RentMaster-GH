@@ -1,7 +1,7 @@
 # app.py
 """
 RentMaster-GH - Rental Property Management Web App
-Main Entry Point & App Router with Defensive Cookie Error Handling
+Main Entry Point & App Router with Strict Role-Based Navigation Filtering
 """
 
 import json
@@ -39,9 +39,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ---------------------------------------------------------------------------
-# DEFENSIVE COOKIE MANAGER SETUP
-# ---------------------------------------------------------------------------
+# Cookie Manager Instance
 try:
     cookie_manager = stx.CookieManager(key="rentmaster_cookie_mgr")
 except Exception:
@@ -49,30 +47,21 @@ except Exception:
 
 
 def safe_get_cookie(cookie_name):
-    if not cookie_manager:
-        return None
-    try:
-        return cookie_manager.get(cookie=cookie_name)
-    except Exception:
-        return None
+    if not cookie_manager: return None
+    try: return cookie_manager.get(cookie=cookie_name)
+    except Exception: return None
 
 
 def safe_set_cookie(cookie_name, value, expires_at):
-    if not cookie_manager:
-        return
-    try:
-        cookie_manager.set(cookie_name, value, expires_at=expires_at)
-    except Exception:
-        pass
+    if not cookie_manager: return
+    try: cookie_manager.set(cookie_name, value, expires_at=expires_at)
+    except Exception: pass
 
 
 def safe_delete_cookie(cookie_name):
-    if not cookie_manager:
-        return
-    try:
-        cookie_manager.delete(cookie_name)
-    except Exception:
-        pass
+    if not cookie_manager: return
+    try: cookie_manager.delete(cookie_name)
+    except Exception: pass
 
 
 # Inject Google Analytics & Site Verification
@@ -86,9 +75,7 @@ if "user" not in st.session_state:
 if "app_currency" not in st.session_state:
     st.session_state["app_currency"] = "GHS"
 
-# ---------------------------------------------------------------------------
 # Persistent Cookie Auto-Login
-# ---------------------------------------------------------------------------
 if st.session_state.get("user") is None and sb:
     saved_session_cookie = safe_get_cookie("rentmaster_session")
     if saved_session_cookie:
@@ -121,19 +108,15 @@ if sb and "code" in st.query_params:
         pass
 
 
-# ---------------------------------------------------------------------------
-# Public Sponsor Dialog (Callable directly from Auth Screen)
-# ---------------------------------------------------------------------------
 @st.dialog("📢 Self-Service Sponsor & Advertiser Hub", width="large")
 def show_public_sponsor_launch_dialog():
     render_sponsor_portal()
 
 
 # ---------------------------------------------------------------------------
-# Beautiful & Modern Role-Aware Authentication Screen
+# Role-Aware Authentication Screen
 # ---------------------------------------------------------------------------
 def auth_page():
-    # Inject Custom Modern CSS
     st.markdown(
         """
         <style>
@@ -151,12 +134,6 @@ def auth_page():
                 font-size: 2.3rem !important;
                 font-weight: 800 !important;
                 margin-bottom: 0.4rem !important;
-                letter-spacing: -0.5px;
-            }
-            .auth-hero-banner p {
-                color: #e0f2fe !important;
-                font-size: 1.05rem !important;
-                margin: 0 !important;
             }
             .paystack-quick-banner {
                 background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
@@ -165,12 +142,6 @@ def auth_page():
                 padding: 1.1rem;
                 text-align: center;
                 margin-bottom: 1.2rem;
-            }
-            .paystack-quick-banner p {
-                color: #065f46;
-                font-weight: 600;
-                font-size: 0.9rem;
-                margin-bottom: 0.6rem;
             }
             .paystack-quick-btn {
                 display: inline-block;
@@ -181,11 +152,8 @@ def auth_page():
                 border-radius: 8px;
                 text-decoration: none;
                 font-size: 0.9rem;
-                box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
             }
-            div[data-testid="stButton"] button:has(p:contains("Launch Advert")),
-            div[data-testid="stButton"] button:has(span:contains("Launch Advert")),
-            div[data-testid="stButton"] button:has(div:contains("Launch Advert")) {
+            div[data-testid="stButton"] button:has(p:contains("Launch Advert")) {
                 background-color: #16a34a !important;
                 border-color: #16a34a !important;
                 color: #ffffff !important;
@@ -220,7 +188,6 @@ def auth_page():
         unsafe_allow_html=True
     )
 
-    # HERO HEADER BANNER
     st.markdown(
         """
         <div class="auth-hero-banner">
@@ -252,7 +219,6 @@ def auth_page():
             tab1, tab2 = st.tabs(["🔒 Log In", "📝 Sign Up"])
             redirect_url = "https://www.rentmastergh.com"
 
-            # TAB 1: LOG IN
             with tab1:
                 email = st.text_input("Email Address", key="login_email", placeholder="user@example.com")
                 password = st.text_input("Password", type="password", key="login_pw")
@@ -268,6 +234,7 @@ def auth_page():
                                 st.session_state["user"] = res.user
                                 st.session_state["remember_me"] = remember_me
                                 st.session_state.pop("current_page", None)
+                                st.session_state.pop("user_role_override", None)
 
                                 if res.session and remember_me:
                                     expires_at = datetime.now() + timedelta(days=30)
@@ -303,7 +270,6 @@ def auth_page():
                     except Exception as e:
                         st.error(f"Google OAuth error: {e}")
 
-            # TAB 2: ROLE-AWARE SIGN UP
             with tab2:
                 new_email = st.text_input("Email Address", key="signup_email", placeholder="user@example.com")
                 confirm_email = st.text_input("Confirm Email Address", key="confirm_email")
@@ -400,16 +366,12 @@ if st.session_state.get("user") is None:
 
 
 # ---------------------------------------------------------------------------
-# AUTOMATIC ROLE-BASED PORTAL ROUTER
+# STRICT ROLE-BASED NAVIGATION ROUTER
 # ---------------------------------------------------------------------------
 active_user = st.session_state.get("user")
 user_role = get_user_role(active_user)
 
-# Auto-set initial landing page depending on user role
-if "current_page" not in st.session_state:
-    st.session_state["current_page"] = "Tenant Portal" if user_role == "tenant" else "Dashboard"
-
-# Configure Available Navigation Pages per Role
+# Strictly define allowed navigation items per role
 if user_role == "tenant":
     PAGES = {
         "Tenant Portal": render_tenant_portal,
@@ -432,10 +394,10 @@ else:  # Landlord / Property Manager
         "Settings": page_settings,
     }
 
-# Ensure selected page exists in PAGES for this role
+# Auto-set default page if none selected or invalid for current role
 nav_keys = list(PAGES.keys())
-if st.session_state["current_page"] not in nav_keys:
-    st.session_state["current_page"] = nav_keys[0]
+if "current_page" not in st.session_state or st.session_state["current_page"] not in nav_keys:
+    st.session_state["current_page"] = "Tenant Portal" if user_role == "tenant" else "Dashboard"
 
 with st.sidebar:
     st.markdown(f"### Navigation ({user_role.title()} View)")
@@ -444,6 +406,15 @@ with st.sidebar:
     selection = st.radio("Go to", nav_keys, index=default_index)
     st.session_state["current_page"] = selection
 
+    # 1-CLICK ROLE VIEW SWITCHER (FOR TESTING & DUAL-ROLE USERS)
+    st.markdown("---")
+    st.caption("🔄 Switch View Mode")
+    target_switch = "landlord" if user_role == "tenant" else "tenant"
+    if st.button(f"Switch to {target_switch.title()} View", use_container_width=True, type="secondary"):
+        st.session_state["user_role_override"] = target_switch
+        st.session_state.pop("current_page", None)
+        st.rerun()
+
     st.markdown("---")
     if st.button("💬 Support & Suggestions", use_container_width=True):
         show_support_dialog()
@@ -451,7 +422,7 @@ with st.sidebar:
     
     if active_user:
         st.write(f"👤 Logged in: **{getattr(active_user, 'email', 'User')}**")
-        st.caption(f"Role: `{user_role.title()}`")
+        st.caption(f"Active View: `{user_role.title()}`")
         if st.button("Logout", key="logout_btn"):
             safe_delete_cookie("rentmaster_session")
             if sb: sb.auth.sign_out()
