@@ -122,6 +122,36 @@ def page_dashboard():
     st.markdown("---")
     render_overdue_alerts_widget(tenants, payments)
 
+    # -------------------------------------------------------------------
+    # TENANT MAINTENANCE & REPAIR TICKETS REVIEW CENTER (ADDED)
+    # -------------------------------------------------------------------
+    st.markdown("---")
+    st.markdown("### 🛠️ Tenant Maintenance & Repair Requests")
+    
+    if maint:
+        for m in maint:
+            with st.container(border=True):
+                mc1, mc2, mc3, mc4 = st.columns([3, 2, 2, 2])
+                with mc1:
+                    st.markdown(f"**{m.get('title', 'Repair Issue')}**")
+                    st.caption(f"Details: {m.get('description', 'No details provided.')}")
+                with mc2:
+                    st.write(f"**Priority:** `{str(m.get('priority', 'medium')).upper()}`")
+                    st.caption(f"Filed: {fmt_date(m.get('created_at'))}")
+                with mc3:
+                    st.write(f"**Status:** `{str(m.get('status', 'open')).upper()}`")
+                with mc4:
+                    # Allow Landlord to update ticket status directly from Dashboard
+                    new_status = st.selectbox("Update Status", ["open", "in_progress", "resolved"], key=f"dash_maint_{m['id']}", index=0)
+                    if st.button("Update Status", key=f"dash_maint_btn_{m['id']}", type="secondary"):
+                        if sb:
+                            sb.table("maintenance_requests").update({"status": new_status}).eq("id", m["id"]).execute()
+                            clear_cache()
+                            st.toast("✅ Maintenance status updated!", icon="🛠️")
+                            st.rerun()
+    else:
+        st.info("🎉 No active maintenance or repair requests filed by tenants.")
+
     st.markdown("---")
     st.markdown("#### Portfolio Summary")
     left, right = st.columns(2)
