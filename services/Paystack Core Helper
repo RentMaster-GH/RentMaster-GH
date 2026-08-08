@@ -1,0 +1,85 @@
+"""
+RentMaster-GH - Paystack Payment Gateway Integration Module
+Supports Ghana Mobile Money (MTN, Telecel, AT) & Cards with Split Payouts.
+"""
+import os
+import requests
+import streamlit as st
+from services.database import sb
+
+# Paystack Secret Key from Secrets or Environment
+PAYSTACK_SECRET_KEY = st.secrets.get("PAYSTACK_SECRET_KEY", os.getenv("PAYSTACK_SECRET_KEY", "sk_live_dummy"))
+PAYSTACK_BASE_URL = "https://api.paystack.co"
+
+
+def initialize_paystack_transaction(email, amount_ghs, reference, callback_url="https://www.rentmastergh.com", split_code=None):
+    """
+    Initializes a Paystack transaction for Rent or Ad payments.
+    Converts GHS to Pesewas (Amount * 100).
+    """
+    url = f"{PAYSTACK_BASE_URL}/transaction/initialize"
+    headers = {
+        "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    # Paystack requires amount in Pesewas (1 GHS = 100 Pesewas)
+    amount_in_pesewas = int(round(float(amount_ghs) * 100))
+
+    payload = {
+        "email": email,
+        "amount": amount_in_pesewas,
+        "currency": "GHS",
+        "reference": reference,
+        "callback_url": callback_url,
+        "channels": ["mobile_money", "card"]  # MTN, Telecel, AT Momo + Cards
+    }
+
+    # If landlord split payout code is active
+    if split_code:
+        payload["split_code"] = split_code
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        res_data = response.json()
+        if res_data.get("status"):
+            return res_data.get("data")
+        else:
+            st.error(f"Paystack Error: {res_data.get('message')}")
+            return None
+    except Exception as e:
+        st.error(f"Paystack Connection Error: {e}")
+        return None
+
+
+def verify_paystack_transaction(reference):
+    """Verifies payment status directly with Paystack API."""
+    url = f"{PAYSTACK_BASE_URL}/transaction/verify/{reference}"
+    headers = {
+        "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"
+    }
+
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        res_data = response.json()
+        if res_data.get("status") and res_data.get("data", {}).get("status") == "success":
+            return res_data.get("data")
+        return None
+    except Exception:
+        return None
+
+
+def handle_paystack_callbacks():
+    """Checks URL query parameters after Paystack redirects user back to app."""
+    query_params = st.query_params
+    if "reference" in query_params or "trxref" in query_params:
+        ref = query_params.get("reference") or query_params.get("trxref")
+        
+        # Verify transaction with Paystack API
+        tx_data = verify_paystack_transaction(ref)
+        if tx_data:
+            st.success(f"🎉 Payment Verified! Reference: {ref}")
+            # Clear URL query parameters to avoid duplicate processing on refresh
+            st.query_params.clear()
+        else:
+            st.warning(f"Payment verification pending or unverified for Ref: {ref}")
