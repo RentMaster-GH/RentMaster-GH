@@ -368,23 +368,22 @@ if st.session_state.get("user") is None:
 
 
 # ---------------------------------------------------------------------------
-# STRICT ROLE-BASED NAVIGATION ROUTER (SPONSOR PORTAL AT THE VERY END)
+# STRICT ROLE-BASED NAVIGATION ROUTER (NO TENANT PORTAL IN LANDLORD VIEW)
 # ---------------------------------------------------------------------------
 active_user = st.session_state.get("user")
 user_role = get_user_role(active_user)
 
-# Strictly define allowed navigation items per role (SPONSOR PORTAL IS LAST)
+# Strictly define allowed navigation items per role
 if user_role == "tenant":
     PAGES = {
         "Tenant Portal": render_tenant_portal,
         "User Profile": page_user_profile,
         "Settings": page_settings,
-        "Sponsor Portal": render_sponsor_portal,  # <-- LAST ITEM
+        "Sponsor Portal": render_sponsor_portal,
     }
-else:  # Landlord / Property Manager
+else:  # Landlord / Property Manager (TENANT PORTAL EXCLUDED HERE)
     PAGES = {
         "Dashboard": page_dashboard,
-        "Tenant Portal": render_tenant_portal,
         "User Profile": page_user_profile,
         "Properties": page_properties,
         "Landlords": page_landlords,
@@ -393,7 +392,7 @@ else:  # Landlord / Property Manager
         "Leases": page_leases,
         "Maintenance": page_maintenance,
         "Settings": page_settings,
-        "Sponsor Portal": render_sponsor_portal,  # <-- LAST ITEM
+        "Sponsor Portal": render_sponsor_portal,
     }
 
 # Auto-set default page if none selected or invalid for current role
