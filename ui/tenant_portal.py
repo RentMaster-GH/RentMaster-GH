@@ -1,10 +1,11 @@
 # ui/tenant_portal.py
 import streamlit as st
 from services.helpers import fmt_money, fmt_date, compute_tenant_ledger, prop_label, get_active_user_info, get_current_currency
-from services.database import sb, fetch_tenant_profile_by_email, fetch_payments, fetch_maintenance, clear_cache
+from services.database import sb, fetch_tenant_profile_by_email, fetch_payments, fetch_maintenance, clear_cache, upload_id_to_supabase
 from services.paystack import initialize_paystack_payment
 from services.pdf_generator import generate_receipt_pdf
 from components.chat import render_chat_interface
+from components.verification import render_id_verification_widget
 from ui.pages_core import header
 
 
@@ -50,12 +51,13 @@ def render_tenant_portal():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # PORTAL TABS
-    tab_pay, tab_docs, tab_maint, tab_chat = st.tabs([
+    # UNIFIED PORTAL TABS (5 Tabs total)
+    tab_pay, tab_docs, tab_maint, tab_chat, tab_kyc = st.tabs([
         "💳 Rent & Installment Payment Portal",
         "📋 Official Rent Documents & Rent Card",
         "🛠️ Repair & Maintenance Requests",
-        "💬 Chat & Video Call Landlord"
+        "💬 Chat & Video Call Landlord",
+        "🆔 Verification & Mutual Agreement"
     ])
 
     # -----------------------------------------------------------------------
@@ -279,17 +281,6 @@ def render_tenant_portal():
             current_user_email=user_email,
             recipient_name=landlord_name
         )
-
-# Portal Tabs
-    tab_pay, tab_docs, tab_maint, tab_chat, tab_kyc = st.tabs([
-        "💳 Rent Ledger & Pay Online",
-        "📋 Official Rent Documents & Rent Card",
-        "🛠️ Repair & Maintenance Requests",
-        "💬 Chat & Video Call Landlord",
-        "🆔 Verification & Mutual Agreement"  # <-- ADDED
-    ])
-
-    # ... tabs 1, 2, 3, 4 ...
 
     # -----------------------------------------------------------------------
     # TAB 5: TENANT VERIFICATION PORTAL & MUTUAL LANDLORD ACCEPTANCE
