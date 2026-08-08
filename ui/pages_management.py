@@ -178,8 +178,10 @@ def page_tenants():
                 prop_id = st.selectbox("Property", list(prop_options.keys()), format_func=lambda x: prop_options.get(x, "-"))
 
             col3, col4 = st.columns(2)
-            col3.date_input("Lease Start", value=date.today())
-            col4.date_input("Lease End", value=date.today() + timedelta(days=365))
+            with col3:
+                st.date_input("Lease Start", value=date.today())
+            with col4:
+                st.date_input("Lease End", value=date.today() + timedelta(days=365))
             active = st.checkbox("Active Tenant", value=True)
 
             if st.form_submit_button("Add Tenant", type="primary"):
