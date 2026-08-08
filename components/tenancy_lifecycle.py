@@ -15,7 +15,7 @@ def calculate_lease_lifecycle(lease_end_date_str):
     - Grace period month calculation (Month 1, 2, or 3)
     """
     try:
-        end_date = datetime.strptime(lease_end_date_str[:10], "%Y-%m-%d")
+        end_date = datetime.strptime(str(lease_end_date_str)[:10], "%Y-%m-%d")
         now = datetime.now()
         days_until_expiration = (end_date - now).days
 
@@ -54,7 +54,7 @@ def calculate_lease_lifecycle(lease_end_date_str):
 def render_tenant_lease_lifecycle_widget(tenant_user, lease_data):
     """Renders expiration warnings, renewal request form, or Grace Period notices for tenants."""
     lease_id = lease_data.get("id", "demo_lease")
-    end_date_str = lease_data.get("end_date", datetime.now().strftime("%Y-%m-%d"))
+    end_date_str = str(lease_data.get("end_date", datetime.now().strftime("%Y-%m-%d")))
 
     lifecycle = calculate_lease_lifecycle(end_date_str)
     tenant_decision = lease_data.get("tenant_intent")  # 'renewal', 'termination', or None
@@ -127,15 +127,15 @@ def render_tenant_lease_lifecycle_widget(tenant_user, lease_data):
                 
                 if landlord_decision == "pending":
                     # Calculate Landlord 14-day countdown
-                    14_day_text = "Landlord has 14 days to review"
+                    fourteen_day_text = "Landlord has 14 days to review"
                     if requested_at_str:
                         try:
                             req_time = datetime.fromisoformat(requested_at_str)
                             days_left_landlord = max(0, 14 - (datetime.now() - req_time).days)
-                            14_day_text = f"⏰ Landlord decision due in {days_left_landlord} days"
+                            fourteen_day_text = f"⏰ Landlord decision due in {days_left_landlord} days"
                         except Exception:
                             pass
-                    st.warning(f"⏳ **Awaiting Landlord Response:** {14_day_text}")
+                    st.warning(f"⏳ **Awaiting Landlord Response:** {fourteen_day_text}")
 
                 elif landlord_decision == "accepted":
                     st.success("🎉 **Landlord Accepted!** Your request has been approved.")
@@ -149,7 +149,7 @@ def render_tenant_lease_lifecycle_widget(tenant_user, lease_data):
 def render_landlord_lease_lifecycle_widget(lease_data):
     """Renders 14-day decision center for landlords reviewing tenant requests."""
     lease_id = lease_data.get("id", "demo_lease")
-    end_date_str = lease_data.get("end_date", datetime.now().strftime("%Y-%m-%d"))
+    end_date_str = str(lease_data.get("end_date", datetime.now().strftime("%Y-%m-%d")))
     lifecycle = calculate_lease_lifecycle(end_date_str)
 
     tenant_decision = lease_data.get("tenant_intent")
