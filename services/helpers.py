@@ -262,3 +262,35 @@ def convert_and_fmt_money(amount_ghs: float, target_currency: str = None) -> str
     else:
         converted_amount = amount_ghs / rate
         return f"{fmt_money(converted_amount, curr)} (approx. {fmt_money(amount_ghs, 'GHS')})"
+
+# ---------------------------------------------------------------------------
+# User Role Resolution Helper
+# ---------------------------------------------------------------------------
+def get_user_role(user) -> str:
+    """
+    Determines if the logged-in user is a 'tenant' or 'landlord' (property manager).
+    Checks Supabase user_metadata first, then queries database records.
+    """
+    if not user:
+        return "landlord"
+
+    # 1. Check metadata set during sign-up
+    user_metadata = getattr(user, "user_metadata", {}) or {}
+    role = user_metadata.get("role")
+    if role in ("tenant", "landlord"):
+        return role
+
+    email = getattr(user, "email", None)
+    if not email:
+        return "landlord"
+
+    # 2. Check if user email is linked to an active tenant record
+    try:
+        from services.database import fetch_tenant_profile_by_email
+        tenant_profile = fetch_tenant_profile_by_email(email)
+        if tenant_profile:
+            return "tenant"
+    except Exception:
+        pass
+
+    return "landlord"
