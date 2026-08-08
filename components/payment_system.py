@@ -1,11 +1,13 @@
 """
 RentMaster-GH - Comprehensive Rent Payment & Installments Module
-Supports Full Rent, Flexible Installments, Progress Tracking, and Paystack Integration.
+Supports Full Rent, Flexible Installments, Progress Tracking, Paystack,
+and Sequential Verification Gating (Manager KYC -> Landlord 2-Day Acceptance -> Agreement -> Condition).
 """
 import streamlit as st
 import json
 from datetime import datetime
-from services.database import sb
+from services.database import sb, fetch_tenant_profile_by_email
+from components.verification import check_tenant_kyc_payment_eligibility
 from components.property_condition import render_tenant_condition_approval_widget
 from components.agreements import render_tenant_agreement_acceptance_widget
 
@@ -123,31 +125,48 @@ def record_payment_intent(lease_id, tenant_email, amount, payment_type, ref):
 def render_comprehensive_rent_payment_widget(user):
     """Renders the Full / Installment Payment UI for Tenants."""
     
-    # 1. PRE-PAYMENT CHECK A: Tenancy Agreement Review & Acceptance
+    tenant_id = getattr(user, "id", "demo_tenant")
+    tenant_email = getattr(user, "email", "tenant@example.com")
+
+    # Fetch tenant record
+    tenant_record = None
+    if sb and tenant_email:
+        try:
+            tenant_record = fetch_tenant_profile_by_email(tenant_email)
+        except Exception:
+            pass
+
+    # 1. MANDATORY GATE 1: App Manager KYC Approval + Landlord 2-Day Acceptance Check
+    kyc_eligible, kyc_reason = check_tenant_kyc_payment_eligibility(tenant_record)
+
+    if not kyc_eligible:
+        st.warning(f"🔒 **Rent Payment Locked:** {kyc_reason}")
+        st.info("Both **App Manager KYC Verification** and **Landlord Acceptance (within 2-day window)** are required before payments can be initialized.")
+        return
+
+    # 2. MANDATORY GATE 2: Tenancy Agreement Review & Acceptance
     agreement_approved = render_tenant_agreement_acceptance_widget(user)
 
     st.divider()
 
-    # Lock payment form if tenant has not accepted tenancy agreement
     if not agreement_approved:
         st.info("🔒 **Rent Payments Locked:** Please review and accept the Tenancy Agreement above to unlock payments.")
         return
 
-    # 2. PRE-PAYMENT CHECK B: Property Condition Inspection & Acceptance
+    # 3. MANDATORY GATE 3: Pre-Move-In Property Condition Inspection & Acceptance
     condition_approved = render_tenant_condition_approval_widget(user)
 
     st.divider()
 
-    # Lock payment form if tenant has not accepted property condition photos
     if not condition_approved:
         st.info("🔒 **Rent Payments Locked:** Please inspect and accept the property condition photos above to unlock the payment checkout form.")
         return
 
+    # ---------------------------------------------------------------------------
+    # UNLOCKED PAYMENT CENTER
+    # ---------------------------------------------------------------------------
     st.markdown("## 💳 Rent Payment & Installment Center")
     st.caption("Pay your rent safely via Mobile Money (MTN, Telecel, AT) or Bank Card.")
-
-    tenant_id = getattr(user, "id", "demo_tenant")
-    tenant_email = getattr(user, "email", "tenant@example.com")
 
     summary = get_lease_payment_summary(tenant_id)
     
