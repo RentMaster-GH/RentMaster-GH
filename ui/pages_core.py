@@ -2,13 +2,50 @@
 import json
 import streamlit as st
 from datetime import date
-from services.helpers import get_active_user_info, fmt_money, fmt_date, get_current_currency, SUPPORTED_CURRENCIES
+from services.helpers import (
+    get_active_user_info, fmt_money, fmt_date, get_current_currency, 
+    SUPPORTED_CURRENCIES, get_user_role
+)
 from services.database import (
     sb, fetch_properties, fetch_tenants, fetch_payments,
     fetch_leases, fetch_maintenance, fetch_landlords, clear_cache
 )
 from components.ads import render_ad_space_management
 from services.alerts import render_overdue_alerts_widget
+
+# ---------------------------------------------------------------------------
+# GLOBAL COUNTRY & CITY DATABASE
+# ---------------------------------------------------------------------------
+GLOBAL_COUNTRIES_AND_CITIES = {
+    "Ghana 🇬🇭": [
+        "Accra", "Kumasi", "Tamale", "Sekondi-Takoradi", "Cape Coast", 
+        "Sunyani", "Koforidua", "Ho", "Bolgatanga", "Wa", "Tema", "Obuasi", "Techiman"
+    ],
+    "Nigeria 🇳🇬": [
+        "Lagos", "Abuja", "Port Harcourt", "Ibadan", "Kano", "Enugu", "Benin City"
+    ],
+    "United Kingdom 🇬🇧": [
+        "London", "Manchester", "Birmingham", "Edinburgh", "Glasgow", "Leeds"
+    ],
+    "United States 🇺🇸": [
+        "New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Dallas", "Atlanta"
+    ],
+    "Canada 🇨🇦": [
+        "Toronto", "Vancouver", "Montreal", "Calgary", "Ottawa"
+    ],
+    "South Africa 🇿🇦": [
+        "Johannesburg", "Cape Town", "Durban", "Pretoria", "Gqeberha"
+    ],
+    "Kenya 🇰🇪": [
+        "Nairobi", "Mombasa", "Kisumu", "Nakuru"
+    ],
+    "Ivory Coast 🇨🇮": [
+        "Abidjan", "Yamoussoukro", "Bouaké"
+    ],
+    "Other International 🌍": [
+        "Other / Custom City"
+    ]
+}
 
 
 def header():
@@ -80,7 +117,7 @@ def page_dashboard():
     col8.metric("Open Maintenance", sum(1 for m in maint if m.get("status") in ("open", "in_progress")))
 
     # -------------------------------------------------------------------
-    # RENT OVERDUE ALERT ENGINE WIDGET (ADDED)
+    # RENT OVERDUE ALERT ENGINE WIDGET
     # -------------------------------------------------------------------
     st.markdown("---")
     render_overdue_alerts_widget(tenants, payments)
@@ -117,6 +154,7 @@ def page_user_profile():
     user = st.session_state.get("user")
     user_email = getattr(user, "email", "Unknown User") if user else "Unknown User"
     user_id = getattr(user, "id", "N/A") if user else "N/A"
+    user_role = get_user_role(user)
 
     profile_tab1, profile_tab2, profile_tab3, profile_tab4, profile_tab5 = st.tabs([
         "1. Account Details",
@@ -132,17 +170,51 @@ def page_user_profile():
             col1, col2 = st.columns(2)
             with col1:
                 st.text_input("User ID", value=user_id, disabled=True)
-                full_name = st.text_input("Full Name", value=st.session_state.get("profile_full_name", ""))
-                phone = st.text_input("Phone Number", value=st.session_state.get("profile_phone", ""))
+                full_name = st.text_input("Full Official Name *", value=st.session_state.get("profile_full_name", ""))
+                phone = st.text_input("Phone Number *", value=st.session_state.get("profile_phone", ""), placeholder="+233 20 000 0000")
             with col2:
                 st.text_input("Email Address", value=user_email, disabled=True)
-                st.selectbox("Account Role", ["Administrator", "Landlord / Property Manager", "Tenant", "Agent"], index=0)
-                st.text_input("Company / Organization", value="RentMaster Operations")
+                
+                # 1. ACCOUNT ROLE DROPDOWN (LOCKED TO TENANT IN TENANT VIEW)
+                if user_role == "tenant":
+                    role_options = ["Tenant"]
+                else:
+                    role_options = ["Landlord / Property Manager"]
 
-            if st.form_submit_button("Save Account Details", type="primary"):
-                st.session_state["profile_full_name"] = full_name
-                st.session_state["profile_phone"] = phone
-                st.toast("✅ Account details saved successfully!", icon="👤")
+                selected_role = st.selectbox("Account Role", options=role_options)
+
+                # 3. COUNTRY & CITY SELECTOR DROPDOWNS
+                selected_country = st.selectbox("Country of Residence *", list(GLOBAL_COUNTRIES_AND_CITIES.keys()), key="profile_country_select")
+                available_cities = GLOBAL_COUNTRIES_AND_CITIES[selected_country]
+                selected_city = st.selectbox("City / Town *", available_cities, key="profile_city_select")
+
+            if st.form_submit_button("Save Account Details", type="primary", use_container_width=True):
+                if not full_name or not phone:
+                    st.error("Please fill in your full name and phone number.")
+                else:
+                    st.session_state["profile_full_name"] = full_name
+                    st.session_state["profile_phone"] = phone
+                    st.session_state["profile_country"] = selected_country
+                    st.session_state["profile_city"] = selected_city
+
+                    # Update Supabase profile table if connected
+                    if sb:
+                        try:
+                            sb.table("profiles").upsert({
+                                "id": user_id,
+                                "email": user_email,
+                                "full_name": full_name,
+                                "phone": phone,
+                                "role": "tenant" if user_role == "tenant" else "landlord",
+                                "country": selected_country,
+                                "city": selected_city
+                            }).execute()
+                        except Exception:
+                            pass
+
+                    st.toast("✅ Account details saved successfully!", icon="👤")
+                    st.success("✅ Profile updated!")
+                    st.rerun()
 
     with profile_tab2:
         st.markdown("#### 👥 User Management")
@@ -158,7 +230,7 @@ def page_user_profile():
         user_table_data = [{
             "User ID": str(user_id)[:8] + "...",
             "Email": user_email,
-            "Role": "System Administrator",
+            "Role": user_role.title(),
             "Status": "Active Now",
             "Joined": str(date.today())
         }]
