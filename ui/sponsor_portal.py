@@ -2,7 +2,7 @@
 import uuid
 import streamlit as st
 from datetime import date, timedelta
-from services.helpers import get_current_currency, fmt_money, fmt_date
+from services.helpers import get_current_currency, fmt_money, fmt_date, convert_and_fmt_money
 from services.database import sb, upload_id_to_supabase
 from services.paystack import initialize_paystack_payment
 from ui.pages_core import header
@@ -97,7 +97,7 @@ def render_sponsor_portal():
                     help="Select where your promotional banner will be displayed on the platform."
                 )
                 monthly_rate = slot_prices[ad_slot]
-                st.info(f"Standard Monthly Slot Rate: **{fmt_money(monthly_rate, curr_code)} / Month**")
+                st.info(f"Standard Monthly Slot Rate: **{convert_and_fmt_money(monthly_rate, curr_code)} / Month**")
 
             st.markdown("#### Step 2: Schedule Duration & Dynamic Price Calculator")
             c_d1, c_d2 = st.columns(2)
@@ -111,11 +111,14 @@ def render_sponsor_portal():
             daily_rate = monthly_rate / 30.0
             total_cost = max(daily_rate, daily_rate * max(1, campaign_days))
 
+            # Multi-Currency Dual Display
+            formatted_checkout_text = convert_and_fmt_money(total_cost, curr_code)
+
             st.markdown(
                 f"""
                 <div style="background-color: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 1rem; margin-top: 0.5rem; margin-bottom: 1rem;">
                     <span style="color: #166534; font-weight: 600; font-size: 0.9rem;">Calculated Duration: <b>{max(1, campaign_days)} Days</b></span><br/>
-                    <span style="color: #15803d; font-weight: 800; font-size: 1.3rem;">Total Checkout Amount: {fmt_money(total_cost, curr_code)}</span>
+                    <span style="color: #15803d; font-weight: 800; font-size: 1.25rem;">Total Checkout Amount: {formatted_checkout_text}</span>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -193,7 +196,7 @@ def render_sponsor_portal():
                                 c1, c2, c3 = st.columns(3)
                                 c1.markdown(f"**{ad.get('business_name')}**")
                                 c1.caption(f"Slot: {ad.get('ad_slot')}")
-                                c2.markdown(f"Rate Paid: **{fmt_money(ad.get('monthly_rate'))}**")
+                                c2.markdown(f"Rate Paid: **{convert_and_fmt_money(ad.get('monthly_rate'), curr_code)}**")
                                 c2.caption(f"Ref: `{ad.get('reference')}`")
                                 status_color = "green" if ad.get("status") in ("paid", "active") else "orange"
                                 c3.markdown(f"Status: :{status_color}[**{str(ad.get('status')).upper()}**]")
