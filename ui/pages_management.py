@@ -209,7 +209,23 @@ def page_tenants():
                 col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
                 col1.markdown(f"**{t.get('name', 'Unnamed')}**")
                 col2.markdown(f"Property: {prop_label(t.get('properties'))}")
-                col3.markdown(f"Status: **{'Active' if t.get('is_active') else 'Inactive'}**")
+                with col3:
+                    status = "Active" if t.get("is_active") else "Inactive"
+                    st.markdown(f"Status: **{status}**")
+                    
+                    v_status = t.get("verification_status", "unverified")
+                    st.caption(f"KYC: `{v_status.upper()}`")
+
+                    # LANDLORD ACCEPTANCE BUTTON
+                    if v_status == "manager_approved" and not t.get("landlord_acceptance"):
+                        if st.button("✅ Accept Tenant", key=f"accept_tenant_{t['id']}", type="primary"):
+                            if sb:
+                                sb.table("tenants").update({"landlord_acceptance": True}).eq("id", t["id"]).execute()
+                                clear_cache()
+                                st.toast("✅ Tenant Accepted & Admitted to Property!", icon="🤝")
+                                st.rerun()
+                    elif t.get("landlord_acceptance"):
+                        st.caption("✅ Landlord Accepted")
                 with col4:
                     with st.popover("💬 Chat & Video"):
                         render_chat_interface(
@@ -448,21 +464,3 @@ def page_maintenance():
                         sb.table("maintenance_requests").delete().eq("id", m["id"]).execute()
                         clear_cache()
                         st.rerun()
-
-with col3:
-                status = "Active" if t.get("is_active") else "Inactive"
-                st.markdown(f"Status: **{status}**")
-                
-                v_status = t.get("verification_status", "unverified")
-                st.caption(f"KYC: `{v_status.upper()}`")
-
-                # LANDLORD ACCEPTANCE BUTTON
-                if v_status == "manager_approved" and not t.get("landlord_acceptance"):
-                    if st.button("✅ Accept Tenant", key=f"accept_tenant_{t['id']}", type="primary"):
-                        if sb:
-                            sb.table("tenants").update({"landlord_acceptance": True}).eq("id", t["id"]).execute()
-                            clear_cache()
-                            st.toast("✅ Tenant Accepted & Admitted to Property!", icon="🤝")
-                            st.rerun()
-                elif t.get("landlord_acceptance"):
-                    st.caption("✅ Landlord Accepted")
