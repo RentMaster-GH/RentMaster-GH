@@ -12,6 +12,7 @@ from services.database import (
 )
 from services.paystack import save_landlord_bank_details, initialize_paystack_payment
 from services.pdf_generator import generate_receipt_pdf
+from services.alerts import render_overdue_alerts_widget
 from components.kyc import render_id_verification_widget
 from ui.pages_core import header
 
@@ -224,6 +225,12 @@ def page_payments():
 
     tenants = fetch_tenants(user_id, user_email)
     all_payments = fetch_payments(user_id, user_email)
+
+    # -------------------------------------------------------------------
+    # RENDER AUTOMATED RENT OVERDUE ALERT WIDGET
+    # -------------------------------------------------------------------
+    render_overdue_alerts_widget(tenants, all_payments)
+    st.markdown("---")
 
     tab_ledger, tab_manual, tab_log = st.tabs([
         "📜 Tenant Rent Ledger & Pay Rent",
