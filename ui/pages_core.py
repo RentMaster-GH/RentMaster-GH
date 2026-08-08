@@ -279,6 +279,35 @@ def page_settings():
                                 clear_cache()
                                 st.rerun()
 
+    with m_tab_landlords:
+        pending_landlords = [l for l in fetch_landlords(user_id, user_email) if l.get("verification_status") == "pending_manager_approval"]
+        if not pending_landlords:
+            st.info("No pending landlord verification submissions.")
+        else:
+            for pl in pending_landlords:
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([3, 2, 2])
+                    c1.markdown(f"**{pl.get('name')}** (`{pl.get('email')}`)")
+                    if pl.get("id_card_url"):
+                        c1.markdown(f"🆔 [View Submitted ID Card]({pl['id_card_url']})")
+                    if pl.get("selfie_url"):
+                        c1.image(pl["selfie_url"], caption="Live Selfie Photo", width=150)
+                    
+                    c2.caption(f"Phone: {pl.get('phone')}")
+                    
+                    with c3:
+                        if st.button("✅ Approve Landlord", key=f"mgr_approve_landlord_{pl['id']}", type="primary"):
+                            if sb:
+                                sb.table("landlords").update({"verification_status": "manager_approved"}).eq("id", pl["id"]).execute()
+                                clear_cache()
+                                st.toast("✅ Landlord Verified & Approved by Manager!", icon="🛡️")
+                                st.rerun()
+                        if st.button("❌ Reject Landlord", key=f"mgr_reject_landlord_{pl['id']}", type="secondary"):
+                            if sb:
+                                sb.table("landlords").update({"verification_status": "rejected"}).eq("id", pl["id"]).execute()
+                                clear_cache()
+                                st.rerun()
+
     st.markdown("---")
     render_ad_space_management(key_prefix="settings_ad")
 
