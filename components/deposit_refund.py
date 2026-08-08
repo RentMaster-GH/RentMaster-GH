@@ -6,7 +6,15 @@ import streamlit as st
 import json
 from datetime import datetime
 from services.database import sb, fetch_maintenance
-from services.paystack import initialize_paystack_transaction
+
+# Safe fallback import for Paystack functions
+try:
+    from services.paystack import initialize_paystack_payment as initialize_paystack_transaction
+except ImportError:
+    try:
+        from services.paystack import initialize_paystack_transaction
+    except ImportError:
+        initialize_paystack_transaction = None
 
 
 def audit_tenant_deposit_and_damages(tenant_id, lease_data):
