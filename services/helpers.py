@@ -266,8 +266,11 @@ def convert_and_fmt_money(amount_ghs: float, target_currency: str = None) -> str
 def get_user_role(user) -> str:
     """
     Determines if the logged-in user is a 'tenant' or 'landlord' (property manager).
-    Checks Supabase user_metadata first, then queries database records.
+    Supports session state role view toggled by user.
     """
+    if st.session_state.get("user_role_override"):
+        return st.session_state["user_role_override"]
+
     if not user:
         return "landlord"
 
@@ -277,15 +280,13 @@ def get_user_role(user) -> str:
         return role
 
     email = getattr(user, "email", None)
-    if not email:
-        return "landlord"
-
-    try:
-        from services.database import fetch_tenant_profile_by_email
-        tenant_profile = fetch_tenant_profile_by_email(email)
-        if tenant_profile:
-            return "tenant"
-    except Exception:
-        pass
+    if email:
+        try:
+            from services.database import fetch_tenant_profile_by_email
+            tenant_profile = fetch_tenant_profile_by_email(email)
+            if tenant_profile:
+                return "tenant"
+        except Exception:
+            pass
 
     return "landlord"
