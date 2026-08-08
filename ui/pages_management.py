@@ -14,6 +14,7 @@ from services.paystack import save_landlord_bank_details, initialize_paystack_pa
 from services.pdf_generator import generate_receipt_pdf
 from services.alerts import render_overdue_alerts_widget
 from components.kyc import render_id_verification_widget
+from components.chat import render_chat_interface
 from ui.pages_core import header
 
 logger = logging.getLogger("RentMaster")
@@ -210,6 +211,15 @@ def page_tenants():
                 col2.markdown(f"Property: {prop_label(t.get('properties'))}")
                 col3.markdown(f"Status: **{'Active' if t.get('is_active') else 'Inactive'}**")
                 with col4:
+                    with st.popover("💬 Chat & Video"):
+                        render_chat_interface(
+                            tenant_id=t.get("id"),
+                            current_user_id=user_id,
+                            current_user_role="landlord",
+                            current_user_email=user_email,
+                            recipient_name=t.get("name", "Tenant")
+                        )
+
                     if st.button("Delete", key=f"del_tenant_{t['id']}", type="secondary"):
                         if sb:
                             sb.table("tenants").delete().eq("id", t["id"]).execute()
