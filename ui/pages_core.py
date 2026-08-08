@@ -243,6 +243,42 @@ def page_settings():
             st.toast(f"Preferences saved! Currency: {selected_currency}.", icon="✅")
             st.rerun()
 
+    # APP MANAGER VERIFICATION DESK
+    st.markdown("---")
+    st.markdown("#### 🛡️ App Manager Verification Desk (KYC Approvals)")
+    st.caption("Review and verify submitted tenant and landlord ID documents and live selfie photos.")
+
+    m_tab_tenants, m_tab_landlords = st.tabs(["👤 Pending Tenant Verifications", "🏠 Pending Landlord Verifications"])
+
+    with m_tab_tenants:
+        pending_tenants = [t for t in fetch_tenants(user_id, user_email) if t.get("verification_status") == "pending_manager_approval"]
+        if not pending_tenants:
+            st.info("No pending tenant verification submissions.")
+        else:
+            for pt in pending_tenants:
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([3, 2, 2])
+                    c1.markdown(f"**{pt.get('name')}** (`{pt.get('email')}`)")
+                    if pt.get("id_card_url"):
+                        c1.markdown(f"🆔 [View Submitted ID Card]({pt['id_card_url']})")
+                    if pt.get("selfie_url"):
+                        c1.image(pt["selfie_url"], caption="Live Selfie Photo", width=150)
+                    
+                    c2.caption(f"Phone: {pt.get('phone')}")
+                    
+                    with c3:
+                        if st.button("✅ Approve Tenant", key=f"mgr_approve_tenant_{pt['id']}", type="primary"):
+                            if sb:
+                                sb.table("tenants").update({"verification_status": "manager_approved"}).eq("id", pt["id"]).execute()
+                                clear_cache()
+                                st.toast("✅ Tenant Verified & Approved by Manager!", icon="🛡️")
+                                st.rerun()
+                        if st.button("❌ Reject Submission", key=f"mgr_reject_tenant_{pt['id']}", type="secondary"):
+                            if sb:
+                                sb.table("tenants").update({"verification_status": "rejected"}).eq("id", pt["id"]).execute()
+                                clear_cache()
+                                st.rerun()
+
     st.markdown("---")
     render_ad_space_management(key_prefix="settings_ad")
 
