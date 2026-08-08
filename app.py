@@ -18,6 +18,7 @@ from ui.pages_management import (
     page_properties, page_landlords, page_tenants,
     page_payments, page_leases, page_maintenance
 )
+from ui.tenant_portal import render_tenant_portal
 
 # ---------------------------------------------------------------------------
 # Streamlit Config (MUST BE FIRST)
@@ -103,6 +104,7 @@ if st.session_state.get("user") is None:
 # Navigation Router
 PAGES = {
     "Dashboard": page_dashboard,
+    "Tenant Portal": render_tenant_portal,
     "User Profile": page_user_profile,
     "Properties": page_properties,
     "Landlords": page_landlords,
