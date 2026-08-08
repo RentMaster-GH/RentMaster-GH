@@ -164,24 +164,24 @@ def page_landlords():
 
 def page_tenants():
     header()
-    st.subheader("Tenants")
+    st.subheader("Tenants Management")
     curr_code = get_current_currency()
     user_id, user_email = get_active_user_info()
 
     props = fetch_properties(user_id, user_email)
     prop_options = {p["id"]: prop_label(p) for p in props} or {"": "No properties available"}
 
+    # CLEAN ADD TENANT FORM (KYC ID Upload Removed - Managed on Tenant Portal)
     with st.expander("Add New Tenant", expanded=False):
-        id_file_data = render_id_verification_widget(entity_type="Tenant", key_prefix="tenant")
         with st.form("add_tenant"):
             col1, col2 = st.columns(2)
             with col1:
-                name = st.text_input("Tenant Name *")
-                email = st.text_input("Email")
+                name = st.text_input("Tenant Name *", placeholder="e.g. Kwame Mensah")
+                email = st.text_input("Email Address *", placeholder="tenant@example.com")
                 rent_amount = st.number_input(f"Agreed Monthly Rent ({curr_code})", min_value=0.0, value=0.0, step=50.0)
             with col2:
-                phone = st.text_input("Phone Number")
-                prop_id = st.selectbox("Property", list(prop_options.keys()), format_func=lambda x: prop_options.get(x, "-"))
+                phone = st.text_input("Phone Number", placeholder="+233 20 000 0000")
+                prop_id = st.selectbox("Assigned Property", list(prop_options.keys()), format_func=lambda x: prop_options.get(x, "-"))
 
             col3, col4 = st.columns(2)
             with col3:
@@ -190,32 +190,31 @@ def page_tenants():
                 st.date_input("Lease End", value=date.today() + timedelta(days=365))
             active = st.checkbox("Active Tenant", value=True)
 
-            if st.form_submit_button("Add Tenant", type="primary"):
-                if not name:
-                    st.error("Tenant name is required.")
+            if st.form_submit_button("Add Tenant", type="primary", use_container_width=True):
+                if not name or not email:
+                    st.error("Tenant name and email address are required.")
                 elif sb:
-                    id_card_url = upload_id_to_supabase(id_file_data, name, folder="tenants") if id_file_data else None
                     payload = {
                         "name": name, "email": email or None, "phone": phone or None,
                         "property_id": prop_id or None, "rent_amount": float(rent_amount),
-                        "is_active": active, "id_card_url": id_card_url
+                        "is_active": active, "verification_status": "unverified"
                     }
                     if user_id: payload["user_id"] = user_id
                     if user_email: payload["user_email"] = user_email
 
                     sb.table("tenants").insert(payload).execute()
                     clear_cache()
-                    st.success(f"Tenant '{name}' added successfully.")
+                    st.success(f"✅ Tenant '{name}' added! Email linked to tenant portal.")
                     st.rerun()
 
     tenants = fetch_tenants(user_id, user_email)
     if tenants:
         st.markdown("---")
-        st.markdown(f"**{len(tenants)} Tenants**")
+        st.markdown(f"**{len(tenants)} Tenants Registered**")
         for t in tenants:
             with st.container(border=True):
                 col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
-                col1.markdown(f"**{t.get('name', 'Unnamed')}**")
+                col1.markdown(f"**{t.get('name', 'Unnamed')}** (`{t.get('email', 'No Email')}`)")
                 col2.markdown(f"Property: {prop_label(t.get('properties'))}")
                 with col3:
                     status = "Active" if t.get("is_active") else "Inactive"
@@ -225,7 +224,7 @@ def page_tenants():
                     st.caption(f"KYC: `{v_status.upper()}`")
 
                     # LANDLORD ACCEPTANCE BUTTON
-                    if v_status == "manager_approved" and not t.get("landlord_acceptance"):
+                    if v_status in ["manager_approved", "pending_manager_approval"] and not t.get("landlord_acceptance"):
                         if st.button("✅ Accept Tenant", key=f"accept_tenant_{t['id']}", type="primary"):
                             if sb:
                                 sb.table("tenants").update({"landlord_acceptance": True}).eq("id", t["id"]).execute()
@@ -390,7 +389,7 @@ def page_leases():
                         clear_cache()
                         st.rerun()
 
-            # INTEGRATED: Landlord Tenancy Agreement Manager (Default, Typed Custom, or PDF Upload)
+            # Landlord Tenancy Agreement Manager
             with st.expander("📜 Manage / Issue Tenancy Agreement", expanded=False):
                 render_landlord_agreement_creator_widget(lease_id=l["id"])
 
