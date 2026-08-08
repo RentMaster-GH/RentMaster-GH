@@ -9,6 +9,7 @@ from components.verification import render_id_verification_widget
 from components.payment_system import render_comprehensive_rent_payment_widget
 from components.tenancy_lifecycle import render_tenant_lease_lifecycle_widget
 from components.property_location_rentcard import render_tenant_gps_and_rentcard_widget
+from components.deposit_refund import render_tenant_deposit_refund_widget
 from ui.pages_core import header
 
 
@@ -52,6 +53,15 @@ def render_tenant_portal():
     with tab_pay:
         # RENT & INSTALLMENT PAYMENT WIDGET
         render_comprehensive_rent_payment_widget(user)
+
+        st.markdown("---")
+        # SECURITY DEPOSIT REFUND CLAIM PORTAL
+        lease_obj = (tenant["leases"][0] if isinstance(tenant["leases"], list) else tenant["leases"]) if (tenant and tenant.get("leases")) else {
+            "id": "lease_demo_101",
+            "tenant_id": tenant.get("id") if tenant else "demo_tenant",
+            "deposit_amount": tenant.get("deposit_amount", 1000.00) if tenant else 1000.00
+        }
+        render_tenant_deposit_refund_widget(user, lease_obj)
 
         st.markdown("---")
         st.markdown("#### 📋 Itemized Rent Ledger & PDF Receipts")
