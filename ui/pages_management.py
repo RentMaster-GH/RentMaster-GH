@@ -19,6 +19,7 @@ from components.property_condition import render_landlord_condition_upload_widge
 from components.agreements import render_landlord_agreement_creator_widget
 from components.tenancy_lifecycle import render_landlord_lease_lifecycle_widget
 from components.property_location_rentcard import render_landlord_gps_and_rentcard_widget
+from components.property_expenses import render_financial_net_income_engine
 from ui.pages_core import header
 
 logger = logging.getLogger("RentMaster")
@@ -289,9 +290,10 @@ def page_payments():
     render_overdue_alerts_widget(tenants, all_payments)
     st.markdown("---")
 
-    tab_ledger, tab_manual, tab_log = st.tabs([
+    tab_ledger, tab_manual, tab_expenses, tab_log = st.tabs([
         "📜 Tenant Rent Ledger & Pay Rent",
         "📝 Record Offline Payment",
+        "📊 Net Income & Expense Manager",
         "📊 Master Payment Log & Receipts"
     ])
 
@@ -320,6 +322,14 @@ def page_payments():
                     )
                     if res.get("status"):
                         st.link_button("👉 Click Here to Pay Now", res["data"]["authorization_url"], type="primary", use_container_width=True)
+
+    with tab_manual:
+        st.markdown("#### 📝 Record Offline Cash / Bank Payment")
+        st.info("Log payments collected directly via Cash or Manual Bank Deposit.")
+
+    with tab_expenses:
+        user = st.session_state.get("user")
+        render_financial_net_income_engine(user)
 
     with tab_log:
         if all_payments:
