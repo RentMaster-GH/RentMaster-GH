@@ -81,27 +81,25 @@ def check_tenant_kyc_payment_eligibility(tenant_data):
 # ---------------------------------------------------------------------------
 # MAIN PUBLIC WIDGET EXPORT
 # ---------------------------------------------------------------------------
-def render_id_verification_widget(user, role="tenant", counterparty_id=None):
+def render_id_verification_widget(user=None, entity_type="Tenant", role="tenant", key_prefix="kyc", counterparty_id=None):
     """
     Main widget exported for tenant_portal.py and landlord dashboards.
-    - user: current active user object from session_state
-    - role: 'tenant' or 'landlord'
-    - counterparty_id: ID of the associated Landlord (if tenant) or Tenant (if landlord)
     """
-    user_id = getattr(user, "id", "demo_user")
-    user_email = getattr(user, "email", "user@example.com")
+    user_id = getattr(user, "id", "demo_user") if user else "demo_user"
+    user_email = getattr(user, "email", "user@example.com") if user else "user@example.com"
+    target_role = entity_type.lower() if entity_type else role
 
-    st.markdown("### 🆔 Tenant Identity Verification (KYC)")
+    st.markdown(f"### 🆔 {entity_type} Identity Verification (KYC)")
 
-    with st.expander("📌 Tenant ID Verification Guidelines", expanded=True):
+    with st.expander(f"📌 {entity_type} ID Verification Guidelines", expanded=True):
         st.markdown(
             """
-            * **Accepted IDs:** National ID / Ghana Card, Passport, Driver's License, Voter ID.
+            * **Accepted IDs:** National ID, Passport, Driver's License, Voter ID.
             * **Quality Standard:** Clear, legible text, no blur or glare.
-            * **Sequential Verification Process:** 
-              1. **App Manager Review** (Document & Live Selfie Audit)
-              2. **Landlord Acceptance** (Must accept within **2 days / 48 hours** of App Manager approval)
-              3. **Rent Payment Unlocked**
+            * **Verification Process:** 
+              1. **App Manager Review** (Document Audit & Live Selfie Audit)
+              2. **Landlord Property Acceptance** (Must accept within **2 days / 48 hours** of App Manager approval)
+              3. **Mutual Tenancy Agreement Completed**
             """
         )
 
@@ -114,8 +112,7 @@ def render_id_verification_widget(user, role="tenant", counterparty_id=None):
     elif current_status in ["pending_manager", "pending_manager_approval"]:
         st.info("⏳ **Status: Submitted for Review.** Your documents have been received and are pending App Manager approval.")
     elif current_status == "pending_counterparty":
-        counter_label = "Landlord" if role == "tenant" else "Tenant"
-        st.info(f"⏳ **Status: Manager Approved!** Awaiting agreement confirmation from your {counter_label} within the 2-day window.")
+        st.info("⏳ **Status: Manager Approved!** Awaiting agreement confirmation from your counterparty within the 2-day window.")
     elif current_status == "approved":
         st.success("✅ **Status: Fully Verified & Approved!** You are cleared for payments and lease agreements.")
     elif current_status == "rejected":
@@ -125,7 +122,7 @@ def render_id_verification_widget(user, role="tenant", counterparty_id=None):
 
     # Submission Form (If Unverified or Rejected)
     if current_status in ["unverified", "rejected"]:
-        _render_kyc_submission_form(user_id, user_email, role, counterparty_id)
+        _render_kyc_submission_form(user_id, user_email, target_role, counterparty_id, key_prefix)
 
     # View Submitted Details
     elif record:
@@ -139,7 +136,7 @@ def render_id_verification_widget(user, role="tenant", counterparty_id=None):
             with c2:
                 st.write(f"**Submission Date:** {record.get('created_at', 'N/A')[:10]}")
                 st.write(f"**Manager Verified:** {'Yes ✅' if record.get('manager_approved') else 'No ⏳'}")
-                st.write(f"**Landlord Accepted:** {'Yes ✅' if record.get('counterparty_approved') else 'No ⏳'}")
+                st.write(f"**Counterparty Accepted:** {'Yes ✅' if record.get('counterparty_approved') else 'No ⏳'}")
 
     return current_status == "approved"
 
@@ -147,15 +144,15 @@ def render_id_verification_widget(user, role="tenant", counterparty_id=None):
 # ---------------------------------------------------------------------------
 # SUBMISSION FORM (Camera + Document Upload)
 # ---------------------------------------------------------------------------
-def _render_kyc_submission_form(user_id, user_email, role, counterparty_id):
+def _render_kyc_submission_form(user_id, user_email, role, counterparty_id, key_prefix="kyc"):
     st.markdown("#### 📝 Step 1: Personal & ID Information")
     
-    with st.form(key=f"kyc_form_{user_id}"):
+    with st.form(key=f"kyc_form_{key_prefix}_{user_id}"):
         col1, col2 = st.columns(2)
         with col1:
             full_name = st.text_input("Full Official Name (Matches ID) *", placeholder="e.g. Kwame Mensah")
-            id_type = st.selectbox("Accepted ID Document Type *", ["National ID / Ghana Card", "Passport", "Driver's License", "Voter ID"])
-            id_number = st.text_input("ID Number *", placeholder="e.g. GHA-123456789-0")
+            id_type = st.selectbox("Accepted ID Document Type *", ["National ID", "Passport", "Driver's License", "Voter ID"])
+            id_number = st.text_input("ID Number *", placeholder="e.g. 123456789")
         with col2:
             phone_number = st.text_input("Phone Number *", placeholder="+233 20 000 0000")
             address = st.text_input("Digital Address / Residential Address", placeholder="e.g. GA-123-4567")
@@ -167,10 +164,10 @@ def _render_kyc_submission_form(user_id, user_email, role, counterparty_id):
         photo_upload = None
 
         with cap_tab1:
-            photo_camera = st.camera_input("Take a clear live selfie holding your ID next to your face *", key=f"cam_{user_id}")
+            photo_camera = st.camera_input("Take a clear live selfie holding your ID next to your face *", key=f"cam_{key_prefix}_{user_id}")
 
         with cap_tab2:
-            photo_upload = st.file_uploader("Upload clear photo of ID Document (PNG, JPG, PDF) *", type=["jpg", "jpeg", "png", "pdf"], key=f"file_{user_id}")
+            photo_upload = st.file_uploader("Upload clear photo of ID Document (PNG, JPG, PDF) *", type=["jpg", "jpeg", "png", "pdf"], key=f"file_{key_prefix}_{user_id}")
 
         consent = st.checkbox("I confirm that the submitted information and document photos are accurate and belong to me.")
 
@@ -201,10 +198,11 @@ def _render_kyc_submission_form(user_id, user_email, role, counterparty_id):
                 }
                 save_kyc_record(record_payload)
                 
-                # Update Supabase tenants table status
+                # Update Supabase table status
                 if sb:
                     try:
-                        sb.table("tenants").update({
+                        table_name = "tenants" if role == "tenant" else "landlords"
+                        sb.table(table_name).update({
                             "verification_status": "pending_manager_approval",
                             "id_number": id_number,
                             "id_type": id_type
@@ -252,7 +250,8 @@ def render_manager_kyc_approval_panel():
                         
                         if sb:
                             try:
-                                sb.table("tenants").update({
+                                table_name = "tenants" if rec.get("role") == "tenant" else "landlords"
+                                sb.table(table_name).update({
                                     "verification_status": "manager_approved",
                                     "manager_approved": True,
                                     "manager_approved_at": datetime.now().isoformat()
