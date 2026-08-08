@@ -20,6 +20,7 @@ from components.agreements import render_landlord_agreement_creator_widget
 from components.tenancy_lifecycle import render_landlord_lease_lifecycle_widget
 from components.property_location_rentcard import render_landlord_gps_and_rentcard_widget
 from components.property_expenses import render_financial_net_income_engine
+from components.deposit_refund import render_landlord_deposit_audit_widget
 from ui.pages_core import header
 
 logger = logging.getLogger("RentMaster")
@@ -431,6 +432,9 @@ def page_leases():
 
             # Landlord 14-Day Renewal Review & Grace Period Eviction Notice Tracker
             render_landlord_lease_lifecycle_widget(l)
+
+            # Landlord Security Deposit Audit & Automated Refund Release Portal
+            render_landlord_deposit_audit_widget(l)
 
 
 def page_maintenance():
