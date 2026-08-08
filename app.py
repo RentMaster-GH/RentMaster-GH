@@ -1,14 +1,16 @@
 # app.py
 """
 RentMaster-GH - Rental Property Management Web App
-Main Entry Point & App Router
+Main Entry Point & App Router with Role-Based Sign-Up & Automatic Direct Routing
 """
 
 import json
 from datetime import datetime, timedelta
 import streamlit as st
 import extra_streamlit_components as stx
-from services.helpers import inject_google_analytics, inject_google_site_verification
+from services.helpers import (
+    inject_google_analytics, inject_google_site_verification, get_user_role
+)
 from services.database import sb, clear_cache
 from services.paystack import handle_paystack_callbacks
 from components.ads import render_public_ad_banners
@@ -96,10 +98,10 @@ def show_public_sponsor_launch_dialog():
 
 
 # ---------------------------------------------------------------------------
-# Beautiful & Modern Authentication Screen
+# Beautiful & Modern Role-Aware Authentication Screen
 # ---------------------------------------------------------------------------
 def auth_page():
-    # Inject Custom Modern CSS for Auth Screen
+    # Inject Custom Modern CSS
     st.markdown(
         """
         <style>
@@ -123,7 +125,6 @@ def auth_page():
                 color: #e0f2fe !important;
                 font-size: 1.05rem !important;
                 margin: 0 !important;
-                font-weight: 400;
             }
             .paystack-quick-banner {
                 background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
@@ -149,14 +150,7 @@ def auth_page():
                 text-decoration: none;
                 font-size: 0.9rem;
                 box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
-                transition: all 0.2s ease;
             }
-            .paystack-quick-btn:hover {
-                background-color: #047857;
-                transform: translateY(-1px);
-            }
-            
-            /* TARGETED GREEN STYLING FOR LAUNCH ADVERT BUTTON */
             div[data-testid="stButton"] button:has(p:contains("Launch Advert")),
             div[data-testid="stButton"] button:has(span:contains("Launch Advert")),
             div[data-testid="stButton"] button:has(div:contains("Launch Advert")) {
@@ -164,17 +158,7 @@ def auth_page():
                 border-color: #16a34a !important;
                 color: #ffffff !important;
                 font-weight: 700 !important;
-                box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3) !important;
             }
-            div[data-testid="stButton"] button:has(p:contains("Launch Advert")):hover,
-            div[data-testid="stButton"] button:has(span:contains("Launch Advert")):hover,
-            div[data-testid="stButton"] button:has(div:contains("Launch Advert")):hover {
-                background-color: #15803d !important;
-                border-color: #15803d !important;
-                color: #ffffff !important;
-                transform: translateY(-1px) !important;
-            }
-
             .feature-pill {
                 display: inline-block;
                 background-color: #f1f5f9;
@@ -209,19 +193,16 @@ def auth_page():
         """
         <div class="auth-hero-banner">
             <h1>🏠 RentMaster-GH Enterprise</h1>
-            <p>Smart Rental Property Management System &middot; Split Payouts &middot; Ghana Rent Cards &middot; KYC Verification</p>
+            <p>Smart Rental Property Management System &middot; Landlord & Tenant Portals &middot; Split Payouts &middot; Ghana Rent Cards</p>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    # 2-COLUMN LAYOUT: Auth Form (Left 1.2) + Sponsor & Partner Showcase (Right 1.0)
     login_col, ad_showcase_col = st.columns([1.2, 1], gap="large")
 
-    # LEFT COLUMN: AUTHENTICATION CARD
     with login_col:
         with st.container(border=True):
-            # Quick Paystack Direct Payment Banner
             st.markdown(
                 """
                 <div class="paystack-quick-banner">
@@ -234,20 +215,20 @@ def auth_page():
                 unsafe_allow_html=True
             )
 
-            st.markdown("<h3 style='text-align: center; margin-bottom: 1rem; color: #0f4c75;'>Account Sign In</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center; margin-bottom: 1rem; color: #0f4c75;'>Account Access</h3>", unsafe_allow_html=True)
 
             tab1, tab2 = st.tabs(["🔒 Log In", "📝 Sign Up"])
             redirect_url = "https://www.rentmastergh.com"
 
             # TAB 1: LOG IN
             with tab1:
-                email = st.text_input("Email Address", key="login_email", placeholder="property_manager@example.com")
+                email = st.text_input("Email Address", key="login_email", placeholder="user@example.com")
                 password = st.text_input("Password", type="password", key="login_pw")
                 remember_me = st.checkbox("Keep me logged in (30 Days)", value=True, key="login_remember_me")
 
-                if st.button("Log In to Dashboard", use_container_width=True, key="login_btn", type="primary"):
+                if st.button("Log In to Account", use_container_width=True, key="login_btn", type="primary"):
                     if not sb:
-                        st.error("Database connection missing. Check environment setup.")
+                        st.error("Database connection missing.")
                     else:
                         try:
                             res = sb.auth.sign_in_with_password({"email": email, "password": password})
@@ -255,7 +236,9 @@ def auth_page():
                                 st.session_state["user"] = res.user
                                 st.session_state["remember_me"] = remember_me
                                 
-                                # SAVE PERSISTENT BROWSER COOKIE (Valid for 30 Days)
+                                # Clear page selection to force auto-routing to tenant/landlord portal
+                                st.session_state.pop("current_page", None)
+
                                 if res.session:
                                     expires_at = datetime.now() + timedelta(days=30)
                                     cookie_data = json.dumps({
@@ -272,7 +255,6 @@ def auth_page():
 
                 st.divider()
 
-                # Google OAuth Login Button
                 if sb:
                     try:
                         res = sb.auth.sign_in_with_oauth({
@@ -291,14 +273,23 @@ def auth_page():
                     except Exception as e:
                         st.error(f"Google OAuth error: {e}")
 
-            # TAB 2: SIGN UP
+            # TAB 2: ROLE-AWARE SIGN UP
             with tab2:
-                new_email = st.text_input("Work Email Address", key="signup_email", placeholder="new_manager@example.com")
+                new_email = st.text_input("Email Address", key="signup_email", placeholder="user@example.com")
                 confirm_email = st.text_input("Confirm Email Address", key="confirm_email")
                 new_password = st.text_input("Create Password", type="password", key="signup_pw")
                 confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pw")
 
-                if st.button("Create Property Manager Account", use_container_width=True, key="signup_btn", type="primary"):
+                # ROLE SELECTOR: LANDLORD vs TENANT
+                role_choice = st.radio(
+                    "Account Type / Role *",
+                    ["🏠 Landlord / Property Manager", "👤 Tenant"],
+                    horizontal=True,
+                    key="signup_role_choice"
+                )
+                selected_role = "landlord" if "Landlord" in role_choice else "tenant"
+
+                if st.button("Create Account", use_container_width=True, key="signup_btn", type="primary"):
                     if new_email != confirm_email:
                         st.error("Email addresses do not match.")
                     elif new_password != confirm_password:
@@ -309,14 +300,20 @@ def auth_page():
                         st.error("Database connection missing.")
                     else:
                         try:
-                            sb.auth.sign_up({"email": new_email, "password": new_password})
-                            st.success("✅ Account created! Check your email inbox to confirm registration.")
+                            sb.auth.sign_up({
+                                "email": new_email,
+                                "password": new_password,
+                                "options": {
+                                    "data": {
+                                        "role": selected_role
+                                    }
+                                }
+                            })
+                            st.success(f"✅ Account created as **{selected_role.title()}**! Check your email inbox to confirm registration.")
                         except Exception as e:
                             st.error(f"Sign Up Error: {e}")
 
-    # RIGHT COLUMN: SPONSOR SELF-SERVICE, PROPERTY LISTING & PLATFORM SHOWCASE
     with ad_showcase_col:
-        # Self-Service Actions Card
         with st.container(border=True):
             st.markdown("#### 📢 Promote & List Properties")
             st.caption("Promote your business or list your vacant property for rent (GH₵ 50 / $5) to visitors across Ghana.")
@@ -334,7 +331,6 @@ def auth_page():
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Platform Capabilities Pills
         with st.container(border=True):
             st.markdown("#### ⚡ Platform Features")
             st.markdown(
@@ -352,14 +348,10 @@ def auth_page():
             )
 
         st.markdown("<br>", unsafe_allow_html=True)
-
-        # Render Active Sponsor Banners
         render_public_ad_banners(ad_slot="Login Page Sidebar Banner")
 
-    # RENDER PUBLIC FEATURED PROPERTY SHOWCASE AT BOTTOM OF AUTH SCREEN
     render_public_featured_properties()
 
-    # TRUST & SECURITY BADGES BAR
     st.markdown(
         """
         <div class="trust-bar">
@@ -377,31 +369,60 @@ if st.session_state.get("user") is None:
     auth_page()
     st.stop()
 
-# Navigation Router
-PAGES = {
-    "Dashboard": page_dashboard,
-    "Tenant Portal": render_tenant_portal,
-    "Sponsor Portal": render_sponsor_portal,
-    "User Profile": page_user_profile,
-    "Properties": page_properties,
-    "Landlords": page_landlords,
-    "Tenants": page_tenants,
-    "Payments": page_payments,
-    "Leases": page_leases,
-    "Maintenance": page_maintenance,
-    "Settings": page_settings,
-}
+
+# ---------------------------------------------------------------------------
+# AUTOMATIC ROLE-BASED PORTAL ROUTER
+# ---------------------------------------------------------------------------
+active_user = st.session_state.get("user")
+user_role = get_user_role(active_user)
+
+# Auto-set initial landing page depending on user role
+if "current_page" not in st.session_state:
+    st.session_state["current_page"] = "Tenant Portal" if user_role == "tenant" else "Dashboard"
+
+# Configure Available Navigation Pages per Role
+if user_role == "tenant":
+    PAGES = {
+        "Tenant Portal": render_tenant_portal,
+        "Sponsor Portal": render_sponsor_portal,
+        "User Profile": page_user_profile,
+        "Settings": page_settings,
+    }
+else:  # Landlord / Property Manager
+    PAGES = {
+        "Dashboard": page_dashboard,
+        "Tenant Portal": render_tenant_portal,
+        "Sponsor Portal": render_sponsor_portal,
+        "User Profile": page_user_profile,
+        "Properties": page_properties,
+        "Landlords": page_landlords,
+        "Tenants": page_tenants,
+        "Payments": page_payments,
+        "Leases": page_leases,
+        "Maintenance": page_maintenance,
+        "Settings": page_settings,
+    }
+
+# Ensure selected page exists in PAGES for this role
+nav_keys = list(PAGES.keys())
+if st.session_state["current_page"] not in nav_keys:
+    st.session_state["current_page"] = nav_keys[0]
 
 with st.sidebar:
-    st.markdown("### Navigation")
-    selection = st.radio("Go to", list(PAGES.keys()))
+    st.markdown(f"### Navigation ({user_role.title()} View)")
+    
+    default_index = nav_keys.index(st.session_state["current_page"])
+    selection = st.radio("Go to", nav_keys, index=default_index)
+    st.session_state["current_page"] = selection
+
     st.markdown("---")
     if st.button("💬 Support & Suggestions", use_container_width=True):
         show_support_dialog()
     st.markdown("---")
-    active_user = st.session_state.get("user")
+    
     if active_user:
         st.write(f"👤 Logged in: **{getattr(active_user, 'email', 'User')}**")
+        st.caption(f"Role: `{user_role.title()}`")
         if st.button("Logout", key="logout_btn"):
             try: cookie_manager.delete("rentmaster_session")
             except Exception: pass
@@ -409,5 +430,5 @@ with st.sidebar:
             st.session_state.clear()
             st.rerun()
 
-# Run Selected Page
-PAGES[selection]()
+# Execute Active Page View
+PAGES[st.session_state["current_page"]]()
