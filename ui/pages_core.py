@@ -12,6 +12,7 @@ from services.database import (
 )
 from components.ads import render_ad_space_management
 from services.alerts import render_overdue_alerts_widget
+from components.property_expenses import render_financial_net_income_engine
 
 # ---------------------------------------------------------------------------
 # GLOBAL COUNTRY & CITY DATABASE
@@ -90,6 +91,7 @@ def page_dashboard():
     header()
     st.subheader("Dashboard Overview")
     user_id, user_email = get_active_user_info()
+    user = st.session_state.get("user")
 
     props = fetch_properties(user_id, user_email)
     tenants = fetch_tenants(user_id, user_email)
@@ -117,13 +119,19 @@ def page_dashboard():
     col8.metric("Open Maintenance", sum(1 for m in maint if m.get("status") in ("open", "in_progress")))
 
     # -------------------------------------------------------------------
+    # PROPERTY EXPENSE & NET INCOME/LOSS FINANCIAL ENGINE
+    # -------------------------------------------------------------------
+    st.markdown("---")
+    render_financial_net_income_engine(user)
+
+    # -------------------------------------------------------------------
     # RENT OVERDUE ALERT ENGINE WIDGET
     # -------------------------------------------------------------------
     st.markdown("---")
     render_overdue_alerts_widget(tenants, payments)
 
     # -------------------------------------------------------------------
-    # TENANT MAINTENANCE & REPAIR TICKETS REVIEW CENTER (ADDED)
+    # TENANT MAINTENANCE & REPAIR TICKETS REVIEW CENTER
     # -------------------------------------------------------------------
     st.markdown("---")
     st.markdown("### 🛠️ Tenant Maintenance & Repair Requests")
@@ -141,7 +149,6 @@ def page_dashboard():
                 with mc3:
                     st.write(f"**Status:** `{str(m.get('status', 'open')).upper()}`")
                 with mc4:
-                    # Allow Landlord to update ticket status directly from Dashboard
                     new_status = st.selectbox("Update Status", ["open", "in_progress", "resolved"], key=f"dash_maint_{m['id']}", index=0)
                     if st.button("Update Status", key=f"dash_maint_btn_{m['id']}", type="secondary"):
                         if sb:
