@@ -1,6 +1,6 @@
 streamlit
 supabase
-extra-streamlit-components
-python-dotenv
 requests
 fpdf2
+extra-streamlit-components
+python-dotenv
