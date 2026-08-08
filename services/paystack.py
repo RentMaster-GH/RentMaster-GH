@@ -232,3 +232,6 @@ def handle_paystack_callbacks():
 
     try: st.query_params.clear()
     except Exception: pass
+
+# Function name compatibility alias
+initialize_paystack_transaction = initialize_paystack_payment
