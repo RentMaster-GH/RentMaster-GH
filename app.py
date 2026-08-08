@@ -158,9 +158,10 @@ def auth_page():
                 text-decoration: none;
                 font-size: 0.9rem;
             }
+            /* GREEN LOGIN & ADVERT BUTTON STYLING */
             div[data-testid="stButton"] button:has(p:contains("Launch Advert")),
-            div[data-testid="stButton"] button:has(span:contains("Launch Advert")),
-            div[data-testid="stButton"] button:has(div:contains("Launch Advert")) {
+            div[data-testid="stFormSubmitButton"] button:has(p:contains("Log In to Account")),
+            div[data-testid="stButton"] button:has(p:contains("Log In to Account")) {
                 background-color: #16a34a !important;
                 border-color: #16a34a !important;
                 color: #ffffff !important;
@@ -227,35 +228,44 @@ def auth_page():
             redirect_url = "https://www.rentmastergh.com"
 
             with tab1:
-                email = st.text_input("Email Address", key="login_email", placeholder="user@example.com")
-                password = st.text_input("Password", type="password", key="login_pw")
-                remember_me = st.checkbox("Keep me logged in (30 Days)", value=True, key="login_remember_me")
+                # WRAPPED IN st.form TO HARVEST BROWSER AUTOFILL CORRECTLY
+                with st.form("login_credentials_form", clear_on_submit=False):
+                    email = st.text_input("Email Address", key="login_email", placeholder="user@example.com")
+                    password = st.text_input("Password", type="password", key="login_pw")
+                    remember_me = st.checkbox("Keep me logged in (30 Days)", value=True, key="login_remember_me")
 
-                if st.button("Log In to Account", use_container_width=True, key="login_btn", type="primary"):
-                    if not sb:
-                        st.error("Database connection missing.")
-                    else:
-                        try:
-                            res = sb.auth.sign_in_with_password({"email": email, "password": password})
-                            if res.user:
-                                st.session_state["user"] = res.user
-                                st.session_state["remember_me"] = remember_me
-                                st.session_state.pop("current_page", None)
-                                st.session_state.pop("user_role_override", None)
+                    login_submitted = st.form_submit_button("Log In to Account", use_container_width=True, type="primary")
 
-                                if res.session and remember_me:
-                                    expires_at = datetime.now() + timedelta(days=30)
-                                    cookie_data = json.dumps({
-                                        "refresh_token": res.session.refresh_token,
-                                        "access_token": res.session.access_token,
-                                        "user_email": res.user.email
-                                    })
-                                    safe_set_cookie("rentmaster_session", cookie_data, expires_at=expires_at)
-                                
-                                clear_cache()
-                                st.rerun()
-                        except Exception as e:
-                            st.error(f"Login Error: {e}")
+                    if login_submitted:
+                        clean_email = email.strip() if email else ""
+                        clean_password = password.strip() if password else ""
+
+                        if not clean_email or not clean_password:
+                            st.error("Please enter both email address and password.")
+                        elif not sb:
+                            st.error("Database connection missing.")
+                        else:
+                            try:
+                                res = sb.auth.sign_in_with_password({"email": clean_email, "password": clean_password})
+                                if res.user:
+                                    st.session_state["user"] = res.user
+                                    st.session_state["remember_me"] = remember_me
+                                    st.session_state.pop("current_page", None)
+                                    st.session_state.pop("user_role_override", None)
+
+                                    if res.session and remember_me:
+                                        expires_at = datetime.now() + timedelta(days=30)
+                                        cookie_data = json.dumps({
+                                            "refresh_token": res.session.refresh_token,
+                                            "access_token": res.session.access_token,
+                                            "user_email": res.user.email
+                                        })
+                                        safe_set_cookie("rentmaster_session", cookie_data, expires_at=expires_at)
+                                    
+                                    clear_cache()
+                                    st.rerun()
+                            except Exception as e:
+                                st.error(f"Login Error: {e}")
 
                 st.divider()
 
