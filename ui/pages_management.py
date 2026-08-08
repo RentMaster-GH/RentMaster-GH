@@ -14,7 +14,7 @@ from services.paystack import save_landlord_bank_details, initialize_paystack_pa
 from services.pdf_generator import generate_receipt_pdf
 from services.alerts import render_overdue_alerts_widget
 from components.kyc import render_id_verification_widget
-from components.chat import render_chat_interface
+from components.chat import render_chat_interface, render_landlord_communication_hub
 from components.property_condition import render_landlord_condition_upload_widget
 from components.agreements import render_landlord_agreement_creator_widget
 from components.tenancy_lifecycle import render_landlord_lease_lifecycle_widget
@@ -170,102 +170,110 @@ def page_landlords():
 
 def page_tenants():
     header()
-    st.subheader("Tenants Management")
+    st.subheader("Tenants Management & Communication Portal")
     curr_code = get_current_currency()
     user_id, user_email = get_active_user_info()
 
-    props = fetch_properties(user_id, user_email)
-    prop_options = {p["id"]: prop_label(p) for p in props} or {"": "No properties available"}
+    t_tab1, t_tab2 = st.tabs(["👤 Tenants Directory", "📞 Direct Chat & Video Call Hub"])
 
-    # CLEAN ADD TENANT FORM
-    with st.expander("Add New Tenant", expanded=False):
-        with st.form("add_tenant"):
-            col1, col2 = st.columns(2)
-            with col1:
-                name = st.text_input("Tenant Name *", placeholder="e.g. Kwame Mensah")
-                email = st.text_input("Email Address *", placeholder="tenant@example.com")
-                rent_amount = st.number_input(f"Agreed Monthly Rent ({curr_code})", min_value=0.0, value=0.0, step=50.0)
-            with col2:
-                phone = st.text_input("Phone Number", placeholder="+233 20 000 0000")
-                prop_id = st.selectbox("Assigned Property", list(prop_options.keys()), format_func=lambda x: prop_options.get(x, "-"))
+    with t_tab1:
+        props = fetch_properties(user_id, user_email)
+        prop_options = {p["id"]: prop_label(p) for p in props} or {"": "No properties available"}
 
-            col3, col4 = st.columns(2)
-            with col3:
-                st.date_input("Lease Start", value=date.today())
-            with col4:
-                st.date_input("Lease End", value=date.today() + timedelta(days=365))
-            active = st.checkbox("Active Tenant", value=True)
+        # CLEAN ADD TENANT FORM
+        with st.expander("Add New Tenant", expanded=False):
+            with st.form("add_tenant"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    name = st.text_input("Tenant Name *", placeholder="e.g. Kwame Mensah")
+                    email = st.text_input("Email Address *", placeholder="tenant@example.com")
+                    rent_amount = st.number_input(f"Agreed Monthly Rent ({curr_code})", min_value=0.0, value=0.0, step=50.0)
+                with col2:
+                    phone = st.text_input("Phone Number", placeholder="+233 20 000 0000")
+                    prop_id = st.selectbox("Assigned Property", list(prop_options.keys()), format_func=lambda x: prop_options.get(x, "-"))
 
-            if st.form_submit_button("Add Tenant", type="primary", use_container_width=True):
-                if not name or not email:
-                    st.error("Tenant name and email address are required.")
-                elif sb:
-                    payload = {
-                        "name": name, "email": email or None, "phone": phone or None,
-                        "property_id": prop_id or None, "rent_amount": float(rent_amount),
-                        "is_active": active, "verification_status": "unverified"
-                    }
-                    if user_id: payload["user_id"] = user_id
-                    if user_email: payload["user_email"] = user_email
-
-                    sb.table("tenants").insert(payload).execute()
-                    clear_cache()
-                    st.success(f"✅ Tenant '{name}' added! Email linked to tenant portal.")
-                    st.rerun()
-
-    tenants = fetch_tenants(user_id, user_email)
-    if tenants:
-        st.markdown("---")
-        st.markdown(f"**{len(tenants)} Tenants Registered**")
-        for t in tenants:
-            with st.container(border=True):
-                col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
-                col1.markdown(f"**{t.get('name', 'Unnamed')}** (`{t.get('email', 'No Email')}`)")
-                col2.markdown(f"Property: {prop_label(t.get('properties'))}")
+                col3, col4 = st.columns(2)
                 with col3:
-                    status = "Active" if t.get("is_active") else "Inactive"
-                    st.markdown(f"Status: **{status}**")
-                    
-                    v_status = t.get("verification_status", "unverified")
-                    mgr_time_str = t.get("manager_approved_at")
-
-                    # LANDLORD 2-DAY ACCEPTANCE BADGE & BUTTON
-                    if v_status in ["manager_approved", "pending_manager_approval"] and not t.get("landlord_acceptance"):
-                        deadline_text = "48h window active"
-                        if mgr_time_str:
-                            try:
-                                app_time = datetime.fromisoformat(mgr_time_str)
-                                hours_left = max(0, int(((app_time + timedelta(days=2)) - datetime.now()).total_seconds() // 3600))
-                                deadline_text = f"⏰ {hours_left}h left to accept"
-                            except Exception:
-                                pass
-
-                        st.warning(f"🛡️ Manager Approved ({deadline_text})")
-                        if st.button("✅ Accept Tenant", key=f"accept_tenant_{t['id']}", type="primary"):
-                            if sb:
-                                sb.table("tenants").update({"landlord_acceptance": True}).eq("id", t["id"]).execute()
-                                clear_cache()
-                                st.toast("✅ Tenant Accepted & Admitted!", icon="🤝")
-                                st.rerun()
-                    elif t.get("landlord_acceptance"):
-                        st.success("✅ Landlord Accepted")
-                    else:
-                        st.caption(f"KYC Status: `{v_status.upper()}`")
+                    st.date_input("Lease Start", value=date.today())
                 with col4:
-                    with st.popover("💬 Chat & Video"):
-                        render_chat_interface(
-                            tenant_id=t.get("id"),
-                            current_user_id=user_id,
-                            current_user_role="landlord",
-                            current_user_email=user_email,
-                            recipient_name=t.get("name", "Tenant")
-                        )
+                    st.date_input("Lease End", value=date.today() + timedelta(days=365))
+                active = st.checkbox("Active Tenant", value=True)
 
-                    if st.button("Delete", key=f"del_tenant_{t['id']}", type="secondary"):
-                        if sb:
-                            sb.table("tenants").delete().eq("id", t["id"]).execute()
-                            clear_cache()
-                            st.rerun()
+                if st.form_submit_button("Add Tenant", type="primary", use_container_width=True):
+                    if not name or not email:
+                        st.error("Tenant name and email address are required.")
+                    elif sb:
+                        payload = {
+                            "name": name, "email": email or None, "phone": phone or None,
+                            "property_id": prop_id or None, "rent_amount": float(rent_amount),
+                            "is_active": active, "verification_status": "unverified"
+                        }
+                        if user_id: payload["user_id"] = user_id
+                        if user_email: payload["user_email"] = user_email
+
+                        sb.table("tenants").insert(payload).execute()
+                        clear_cache()
+                        st.success(f"✅ Tenant '{name}' added! Email linked to tenant portal.")
+                        st.rerun()
+
+        tenants = fetch_tenants(user_id, user_email)
+        if tenants:
+            st.markdown("---")
+            st.markdown(f"**{len(tenants)} Tenants Registered**")
+            for t in tenants:
+                with st.container(border=True):
+                    col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+                    col1.markdown(f"**{t.get('name', 'Unnamed')}** (`{t.get('email', 'No Email')}`)")
+                    col2.markdown(f"Property: {prop_label(t.get('properties'))}")
+                    with col3:
+                        status = "Active" if t.get("is_active") else "Inactive"
+                        st.markdown(f"Status: **{status}**")
+                        
+                        v_status = t.get("verification_status", "unverified")
+                        mgr_time_str = t.get("manager_approved_at")
+
+                        # LANDLORD 2-DAY ACCEPTANCE BADGE & BUTTON
+                        if v_status in ["manager_approved", "pending_manager_approval"] and not t.get("landlord_acceptance"):
+                            deadline_text = "48h window active"
+                            if mgr_time_str:
+                                try:
+                                    app_time = datetime.fromisoformat(mgr_time_str)
+                                    hours_left = max(0, int(((app_time + timedelta(days=2)) - datetime.now()).total_seconds() // 3600))
+                                    deadline_text = f"⏰ {hours_left}h left to accept"
+                                except Exception:
+                                    pass
+
+                            st.warning(f"🛡️ Manager Approved ({deadline_text})")
+                            if st.button("✅ Accept Tenant", key=f"accept_tenant_{t['id']}", type="primary"):
+                                if sb:
+                                    sb.table("tenants").update({"landlord_acceptance": True}).eq("id", t["id"]).execute()
+                                    clear_cache()
+                                    st.toast("✅ Tenant Accepted & Admitted!", icon="🤝")
+                                    st.rerun()
+                        elif t.get("landlord_acceptance"):
+                            st.success("✅ Landlord Accepted")
+                        else:
+                            st.caption(f"KYC Status: `{v_status.upper()}`")
+                    with col4:
+                        with st.popover("💬 Chat & Video"):
+                            render_chat_interface(
+                                tenant_id=t.get("id"),
+                                current_user_id=user_id,
+                                current_user_role="landlord",
+                                current_user_email=user_email,
+                                recipient_name=t.get("name", "Tenant")
+                            )
+
+                        if st.button("Delete", key=f"del_tenant_{t['id']}", type="secondary"):
+                            if sb:
+                                sb.table("tenants").delete().eq("id", t["id"]).execute()
+                                clear_cache()
+                                st.rerun()
+
+    # TAB 2: DEDICATED LANDLORD COMMUNICATION HUB
+    with t_tab2:
+        user = st.session_state.get("user")
+        render_landlord_communication_hub(user)
 
 
 def page_payments():
