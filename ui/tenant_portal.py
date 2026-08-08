@@ -279,3 +279,84 @@ def render_tenant_portal():
             current_user_email=user_email,
             recipient_name=landlord_name
         )
+
+# Portal Tabs
+    tab_pay, tab_docs, tab_maint, tab_chat, tab_kyc = st.tabs([
+        "💳 Rent Ledger & Pay Online",
+        "📋 Official Rent Documents & Rent Card",
+        "🛠️ Repair & Maintenance Requests",
+        "💬 Chat & Video Call Landlord",
+        "🆔 Verification & Mutual Agreement"  # <-- ADDED
+    ])
+
+    # ... tabs 1, 2, 3, 4 ...
+
+    # -----------------------------------------------------------------------
+    # TAB 5: TENANT VERIFICATION PORTAL & MUTUAL LANDLORD ACCEPTANCE
+    # -----------------------------------------------------------------------
+    with tab_kyc:
+        st.markdown("#### 🆔 Tenant Verification & Tenancy Mutual Agreement")
+        
+        status = tenant.get("verification_status", "unverified")
+        landlord_accepted = tenant.get("landlord_acceptance", False)
+        tenant_accepted = tenant.get("tenant_acceptance", False)
+
+        # 1. MUTUAL ACCEPTANCE BANNER
+        if landlord_accepted and not tenant_accepted:
+            st.markdown(
+                f"""
+                <div style="background-color: #f0fdf4; border: 2px solid #86efac; border-radius: 12px; padding: 1.2rem; margin-bottom: 1.5rem;">
+                    <h4 style="color: #166534; margin: 0 0 0.4rem 0;">🎉 Landlord Acceptance Received!</h4>
+                    <p style="color: #15803d; margin: 0 0 0.8rem 0;">
+                        Landlord <b>{landlord_obj.get('name', 'Property Manager')}</b> has reviewed your verified application and accepted to admit you to <b>{prop_label(prop_obj)}</b>!
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            if st.button("✅ Accept Landlord & Confirm Tenancy Agreement", type="primary", use_container_width=True):
+                if sb:
+                    try:
+                        sb.table("tenants").update({"tenant_acceptance": True}).eq("id", tenant["id"]).execute()
+                        clear_cache()
+                        st.toast("🎉 Tenancy formally confirmed by both parties!", icon="🤝")
+                        st.success("✅ Tenancy agreement confirmed! You have accepted the landlord.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error confirming agreement: {e}")
+
+        elif landlord_accepted and tenant_accepted:
+            st.success("🤝 **Tenancy Agreement Fully Confirmed:** Both App Manager, Landlord, and Tenant have verified and accepted the rental agreement.")
+
+        st.markdown("---")
+        st.markdown("##### Verification Status & Profile Details")
+        st.write(f"• **App Manager KYC Status:** `{status.upper()}`")
+        st.write(f"• **Landlord Property Acceptance:** `{'ACCEPTED' if landlord_accepted else 'PENDING'}`")
+        st.write(f"• **Tenant Mutual Agreement:** `{'ACCEPTED' if tenant_accepted else 'PENDING'}`")
+
+        if status == "unverified":
+            st.markdown("---")
+            st.markdown("##### Submit KYC Info for App Manager Approval")
+            
+            id_file, selfie_file = render_id_verification_widget(entity_type="Tenant", key_prefix="tenant_portal_kyc")
+
+            if st.button("📤 Submit Profile for App Manager Verification", type="primary"):
+                if not id_file:
+                    st.error("Please upload your ID card document.")
+                elif sb:
+                    try:
+                        id_url = upload_id_to_supabase(id_file, tenant["name"], folder="tenants")
+                        selfie_url = upload_id_to_supabase(selfie_file, f"selfie_{tenant['name']}", folder="tenants") if selfie_file else None
+
+                        sb.table("tenants").update({
+                            "id_card_url": id_url,
+                            "selfie_url": selfie_url,
+                            "verification_status": "pending_manager_approval"
+                        }).eq("id", tenant["id"]).execute()
+
+                        clear_cache()
+                        st.success("✅ KYC submitted to App Manager for approval!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to submit KYC: {e}")
