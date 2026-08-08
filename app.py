@@ -1,3 +1,5 @@
+--- START OF FILE Paste August 08, 2026 - 8:08AM ---
+
 """
 RentMaster-GH - Rental Property Management Web App
 Full interactive UI backed by Supabase. Manages properties, tenants,
@@ -55,8 +57,29 @@ def inject_google_analytics(measurement_id="G-EFD2P6FKM5"):
     components.html(ga_html, height=0, width=0)
 
 
-# Inject Google Analytics
+def inject_google_site_verification(verification_code="SXu9dztavBBjKgrko60Tx2CjufX2KvyRhW42SOczZrc"):
+    """
+    Injects Google Site Verification meta tag into the main browser document head.
+    """
+    verification_js = f"""
+    <script>
+      (function() {{
+        const parentHead = window.parent.document.head;
+        if (!parentHead.querySelector('meta[name="google-site-verification"]')) {{
+          const meta = window.parent.document.createElement('meta');
+          meta.name = 'google-site-verification';
+          meta.content = '{verification_code}';
+          parentHead.appendChild(meta);
+        }}
+      }})();
+    </script>
+    """
+    components.html(verification_js, height=0, width=0)
+
+
+# Inject Google Analytics & Site Verification
 inject_google_analytics("G-EFD2P6FKM5")
+inject_google_site_verification("SXu9dztavBBjKgrko60Tx2CjufX2KvyRhW42SOczZrc")
 
 
 def get_secret(key: str, default: str = "") -> str:
