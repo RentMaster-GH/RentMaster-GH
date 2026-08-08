@@ -1,7 +1,7 @@
 # app.py
 """
 RentMaster-GH - Rental Property Management Web App
-Main Entry Point & App Router with Role-Based Sign-Up & Automatic Direct Routing
+Main Entry Point & App Router with Defensive Cookie Error Handling
 """
 
 import json
@@ -39,8 +39,41 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Cookie Manager Instance
-cookie_manager = stx.CookieManager(key="rentmaster_cookie_mgr")
+# ---------------------------------------------------------------------------
+# DEFENSIVE COOKIE MANAGER SETUP
+# ---------------------------------------------------------------------------
+try:
+    cookie_manager = stx.CookieManager(key="rentmaster_cookie_mgr")
+except Exception:
+    cookie_manager = None
+
+
+def safe_get_cookie(cookie_name):
+    if not cookie_manager:
+        return None
+    try:
+        return cookie_manager.get(cookie=cookie_name)
+    except Exception:
+        return None
+
+
+def safe_set_cookie(cookie_name, value, expires_at):
+    if not cookie_manager:
+        return
+    try:
+        cookie_manager.set(cookie_name, value, expires_at=expires_at)
+    except Exception:
+        pass
+
+
+def safe_delete_cookie(cookie_name):
+    if not cookie_manager:
+        return
+    try:
+        cookie_manager.delete(cookie_name)
+    except Exception:
+        pass
+
 
 # Inject Google Analytics & Site Verification
 inject_google_analytics("G-EFD2P6FKM5")
@@ -57,9 +90,9 @@ if "app_currency" not in st.session_state:
 # Persistent Cookie Auto-Login
 # ---------------------------------------------------------------------------
 if st.session_state.get("user") is None and sb:
-    try:
-        saved_session_cookie = cookie_manager.get(cookie="rentmaster_session")
-        if saved_session_cookie:
+    saved_session_cookie = safe_get_cookie("rentmaster_session")
+    if saved_session_cookie:
+        try:
             session_data = json.loads(saved_session_cookie) if isinstance(saved_session_cookie, str) else saved_session_cookie
             ref_token = session_data.get("refresh_token")
             acc_token = session_data.get("access_token")
@@ -68,9 +101,8 @@ if st.session_state.get("user") is None and sb:
                 res = sb.auth.set_session(acc_token, ref_token)
                 if res and res.user:
                     st.session_state["user"] = res.user
-    except Exception:
-        try: cookie_manager.delete("rentmaster_session")
-        except Exception: pass
+        except Exception:
+            safe_delete_cookie("rentmaster_session")
 
 # Global Paystack Payment Callback Verification Handler
 handle_paystack_callbacks()
@@ -235,18 +267,16 @@ def auth_page():
                             if res.user:
                                 st.session_state["user"] = res.user
                                 st.session_state["remember_me"] = remember_me
-                                
-                                # Clear page selection to force auto-routing to tenant/landlord portal
                                 st.session_state.pop("current_page", None)
 
-                                if res.session:
+                                if res.session and remember_me:
                                     expires_at = datetime.now() + timedelta(days=30)
                                     cookie_data = json.dumps({
                                         "refresh_token": res.session.refresh_token,
                                         "access_token": res.session.access_token,
                                         "user_email": res.user.email
                                     })
-                                    cookie_manager.set("rentmaster_session", cookie_data, expires_at=expires_at)
+                                    safe_set_cookie("rentmaster_session", cookie_data, expires_at=expires_at)
                                 
                                 clear_cache()
                                 st.rerun()
@@ -280,7 +310,6 @@ def auth_page():
                 new_password = st.text_input("Create Password", type="password", key="signup_pw")
                 confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pw")
 
-                # ROLE SELECTOR: LANDLORD vs TENANT
                 role_choice = st.radio(
                     "Account Type / Role *",
                     ["🏠 Landlord / Property Manager", "👤 Tenant"],
@@ -424,8 +453,7 @@ with st.sidebar:
         st.write(f"👤 Logged in: **{getattr(active_user, 'email', 'User')}**")
         st.caption(f"Role: `{user_role.title()}`")
         if st.button("Logout", key="logout_btn"):
-            try: cookie_manager.delete("rentmaster_session")
-            except Exception: pass
+            safe_delete_cookie("rentmaster_session")
             if sb: sb.auth.sign_out()
             st.session_state.clear()
             st.rerun()
