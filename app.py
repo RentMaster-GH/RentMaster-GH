@@ -11,6 +11,7 @@ import extra_streamlit_components as stx
 from services.helpers import inject_google_analytics, inject_google_site_verification
 from services.database import sb, clear_cache
 from services.paystack import handle_paystack_callbacks
+from components.ads import render_public_ad_banners
 from ui.pages_core import (
     header, show_support_dialog, page_dashboard,
     page_user_profile, page_settings
@@ -82,15 +83,15 @@ if sb and "code" in st.query_params:
 
 
 # ---------------------------------------------------------------------------
-# Comprehensive Centered Login & Sign-Up Interface
+# Authentication Screen with Integrated Sponsor Showcase
 # ---------------------------------------------------------------------------
 def auth_page():
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Center the auth card using 3 columns [Margin, Main Card, Margin]
-    left_margin, center_card, right_margin = st.columns([1, 2, 1])
+    # 2-Column Layout: Login/Signup Card (Left) + Subtle Sponsor Showcase (Right)
+    login_col, ad_showcase_col = st.columns([1.2, 1])
 
-    with center_card:
+    with login_col:
         with st.container(border=True):
             # Public Paystack Payment / Support Banner
             st.markdown(
@@ -182,6 +183,14 @@ def auth_page():
                             st.success("✅ Account created! Check your email to confirm registration.")
                         except Exception as e:
                             st.error(f"Sign Up Error: {e}")
+
+    # RIGHT COLUMN: SUBTLE SPONSOR SHOWCASE
+    with ad_showcase_col:
+        st.markdown("#### 🌟 Featured Partners & Services")
+        st.caption("Services recommended for property managers, landlords, and tenants across Ghana & West Africa.")
+        
+        # Render subtle paid sponsor banners
+        render_public_ad_banners(ad_slot="Login Page Sidebar Banner")
 
 
 # Stop unauthenticated users from accessing app dashboard
