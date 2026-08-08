@@ -7,7 +7,13 @@ from services.pdf_generator import generate_receipt_pdf
 from components.chat import render_chat_interface
 from components.verification import render_id_verification_widget
 from ui.pages_core import header
+from components.payment_system import render_comprehensive_rent_payment_widget
 
+def render_tenant_portal():
+    user = st.session_state.get("user")
+    
+    # Render Tenant Rent Payment Center
+    render_comprehensive_rent_payment_widget(user)
 
 def render_tenant_portal():
     header()
