@@ -8,6 +8,7 @@ from services.database import (
     fetch_leases, fetch_maintenance, fetch_landlords, clear_cache
 )
 from components.ads import render_ad_space_management
+from services.alerts import render_overdue_alerts_widget
 
 
 def header():
@@ -77,6 +78,12 @@ def page_dashboard():
     col6.metric("Pending", fmt_money(pending))
     col7.metric("Overdue", fmt_money(overdue))
     col8.metric("Open Maintenance", sum(1 for m in maint if m.get("status") in ("open", "in_progress")))
+
+    # -------------------------------------------------------------------
+    # RENT OVERDUE ALERT ENGINE WIDGET (ADDED)
+    # -------------------------------------------------------------------
+    st.markdown("---")
+    render_overdue_alerts_widget(tenants, payments)
 
     st.markdown("---")
     st.markdown("#### Portfolio Summary")
