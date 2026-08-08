@@ -5,6 +5,7 @@ Main Entry Point & App Router
 """
 
 import json
+from datetime import datetime, timedelta
 import streamlit as st
 import extra_streamlit_components as stx
 from services.helpers import inject_google_analytics, inject_google_site_verification
@@ -80,23 +81,110 @@ if sb and "code" in st.query_params:
         pass
 
 
-# Login Page Render
+# ---------------------------------------------------------------------------
+# Comprehensive Centered Login & Sign-Up Interface
+# ---------------------------------------------------------------------------
 def auth_page():
-    st.markdown("<h2 style='text-align: center;'>RentMaster-GH</h2>", unsafe_allow_html=True)
-    email = st.text_input("Email")
-    password = st.text_input("Password", type="password")
-    if st.button("Log In", type="primary", use_container_width=True):
-        if sb:
-            try:
-                res = sb.auth.sign_in_with_password({"email": email, "password": password})
-                if res.user:
-                    st.session_state["user"] = res.user
-                    clear_cache()
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Login failed: {e}")
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Center the auth card using 3 columns [Margin, Main Card, Margin]
+    left_margin, center_card, right_margin = st.columns([1, 2, 1])
+
+    with center_card:
+        with st.container(border=True):
+            # Public Paystack Payment / Support Banner
+            st.markdown(
+                """
+                <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.9rem; margin-bottom: 1rem; text-align: center;">
+                    <p style="margin: 0 0 0.4rem 0; font-weight: 600; color: #166534; font-size: 0.88rem;">Looking to make a payment or support without logging in?</p>
+                    <a href="https://paystack.shop/pay/zvx0npq7hv" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #09a5db; color: #ffffff; font-weight: 600; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 0.88rem;">💙 Make a Payment / Donation via Paystack</a>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.markdown("<h2 style='text-align: center; margin-bottom: 1rem;'>RentMaster-GH</h2>", unsafe_allow_html=True)
+
+            tab1, tab2 = st.tabs(["🔒 Log In", "📝 Sign Up"])
+            redirect_url = "https://www.rentmastergh.com"
+
+            # TAB 1: LOG IN
+            with tab1:
+                email = st.text_input("Email", key="login_email")
+                password = st.text_input("Password", type="password", key="login_pw")
+                remember_me = st.checkbox("Remember Me", value=True, key="login_remember_me")
+
+                if st.button("Log In", use_container_width=True, key="login_btn", type="primary"):
+                    if not sb:
+                        st.error("Database connection missing.")
+                    else:
+                        try:
+                            res = sb.auth.sign_in_with_password({"email": email, "password": password})
+                            if res.user:
+                                st.session_state["user"] = res.user
+                                st.session_state["remember_me"] = remember_me
+                                
+                                # SAVE PERSISTENT BROWSER COOKIE (Valid for 30 Days)
+                                if res.session:
+                                    expires_at = datetime.now() + timedelta(days=30)
+                                    cookie_data = json.dumps({
+                                        "refresh_token": res.session.refresh_token,
+                                        "access_token": res.session.access_token,
+                                        "user_email": res.user.email
+                                    })
+                                    cookie_manager.set("rentmaster_session", cookie_data, expires_at=expires_at)
+                                
+                                clear_cache()
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Login Error: {e}")
+
+                st.divider()
+
+                # Google OAuth Login Button
+                if sb:
+                    try:
+                        res = sb.auth.sign_in_with_oauth({
+                            "provider": "google",
+                            "options": {"redirect_to": redirect_url}
+                        })
+                        if res.url:
+                            st.markdown(
+                                f"""
+                                <a href="{res.url}" target="_self" style="display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; background-color: white; color: #3c4043; font-weight: 500; text-decoration: none; box-sizing: border-box; font-size: 0.9rem;">
+                                    <img src="https://www.gstatic.com/images/branding/product/1x/gsa_64dp.png" width="18" height="18"> Continue with Google
+                                </a>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                    except Exception as e:
+                        st.error(f"Google OAuth error: {e}")
+
+            # TAB 2: SIGN UP
+            with tab2:
+                new_email = st.text_input("Email Address", key="signup_email")
+                confirm_email = st.text_input("Confirm Email Address", key="confirm_email")
+                new_password = st.text_input("Password", type="password", key="signup_pw")
+                confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pw")
+
+                if st.button("Create Account", use_container_width=True, key="signup_btn", type="primary"):
+                    if new_email != confirm_email:
+                        st.error("Emails do not match")
+                    elif new_password != confirm_password:
+                        st.error("Passwords do not match")
+                    elif len(new_password) < 6:
+                        st.error("Password must be at least 6 characters long")
+                    elif not sb:
+                        st.error("Database connection missing.")
+                    else:
+                        try:
+                            sb.auth.sign_up({"email": new_email, "password": new_password})
+                            st.success("✅ Account created! Check your email to confirm registration.")
+                        except Exception as e:
+                            st.error(f"Sign Up Error: {e}")
 
 
+# Stop unauthenticated users from accessing app dashboard
 if st.session_state.get("user") is None:
     auth_page()
     st.stop()
