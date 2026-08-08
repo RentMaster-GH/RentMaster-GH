@@ -227,3 +227,38 @@ def compute_tenant_ledger(tenant: dict, all_payments: list):
         "statement": statement,
         "tenant_payments": tenant_payments
     }
+
+
+# ---------------------------------------------------------------------------
+# Multi-Currency Conversion & Dual Display Helper (ADDED)
+# ---------------------------------------------------------------------------
+EXCHANGE_RATES_TO_GHS = {
+    "GHS": 1.0,
+    "USD": 15.50,  # 1 USD = ~15.50 GHS
+    "EUR": 16.80,  # 1 EUR = ~16.80 GHS
+    "GBP": 19.80,  # 1 GBP = ~19.80 GHS
+    "NGN": 0.010,  # 1 NGN = ~0.01 GHS
+    "KES": 0.12,   # 1 KES = ~0.12 GHS
+    "ZAR": 0.85,   # 1 ZAR = ~0.85 GHS
+    "CAD": 11.20,
+    "AUD": 10.10,
+    "XOF": 0.025,
+    "INR": 0.18,
+    "AED": 4.22
+}
+
+
+def convert_and_fmt_money(amount_ghs: float, target_currency: str = None) -> str:
+    """
+    Converts a GHS base amount and formats it with its foreign currency equivalent.
+    e.g. 'GHs 500.00 (approx. $ 32.26 USD)'
+    """
+    curr = target_currency or get_current_currency()
+    rate = EXCHANGE_RATES_TO_GHS.get(curr, 1.0)
+
+    if curr == "GHS":
+        usd_equiv = amount_ghs / EXCHANGE_RATES_TO_GHS["USD"]
+        return f"{fmt_money(amount_ghs, 'GHS')} (approx. {fmt_money(usd_equiv, 'USD')})"
+    else:
+        converted_amount = amount_ghs / rate
+        return f"{fmt_money(converted_amount, curr)} (approx. {fmt_money(amount_ghs, 'GHS')})"
