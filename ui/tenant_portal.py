@@ -8,6 +8,7 @@ from components.chat import render_chat_interface
 from components.verification import render_id_verification_widget
 from components.payment_system import render_comprehensive_rent_payment_widget
 from components.tenancy_lifecycle import render_tenant_lease_lifecycle_widget
+from components.property_location_rentcard import render_tenant_gps_and_rentcard_widget
 from ui.pages_core import header
 
 
@@ -89,15 +90,11 @@ def render_tenant_portal():
             st.info("ℹ️ Once your landlord links your email address (`" + str(user_email) + "`) to your property lease, your official ledger history will automatically appear here.")
 
     # -----------------------------------------------------------------------
-    # TAB 2: DOCUMENTS & GHANA RENT CARD
+    # TAB 2: DOCUMENTS, GHANA RENT CARD & GPS DIRECTIONS
     # -----------------------------------------------------------------------
     with tab_docs:
-        st.markdown("#### 📋 Official Rent Documents")
-        if tenant and tenant.get("rent_card_url"):
-            st.success("✅ **Official Ghana Rent Card Issued:** Your landlord has published your official Rent Card.")
-            st.link_button("📥 View / Download Official Ghana Rent Card", tenant["rent_card_url"], type="primary")
-        else:
-            st.info("ℹ️ No Ghana Rent Card published yet by your landlord.")
+        prop_id = (tenant.get("properties") or {}).get("id", "demo_prop_1") if tenant and isinstance(tenant.get("properties"), dict) else "demo_prop_1"
+        render_tenant_gps_and_rentcard_widget(user, property_id=prop_id)
 
     # -----------------------------------------------------------------------
     # TAB 3: MAINTENANCE REQUESTS
