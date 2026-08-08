@@ -1,13 +1,28 @@
-# app.py
 """
 RentMaster-GH - Rental Property Management Web App
 Main Entry Point & App Router with Strict Role-Based Navigation Filtering
 """
-
+import os
+import sys
 import json
 from datetime import datetime, timedelta
+
+# 1. Add the root directory to sys.path FIRST
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# 2. Third-party library imports
 import streamlit as st
 import extra_streamlit_components as stx
+
+# 3. Streamlit Config (MUST BE CALLED BEFORE LOCAL UI/COMPONENT IMPORTS)
+st.set_page_config(
+    page_title="RentMaster-GH | Rental Property Management System",
+    page_icon="🏠",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# 4. Local application imports
 from services.helpers import (
     inject_google_analytics, inject_google_site_verification, get_user_role
 )
