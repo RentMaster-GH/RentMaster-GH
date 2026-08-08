@@ -213,3 +213,21 @@ def handle_paystack_callbacks():
 
     try: st.query_params.clear()
     except Exception: pass
+
+# -----------------------------------------------------------------------
+    # PUBLIC PROPERTY LISTING PAYMENT VERIFICATION (GH₵ 50 / $5)
+    # -----------------------------------------------------------------------
+    elif reference.startswith("PROP-"):
+        with st.spinner("Verifying Property Listing Payment with Paystack..."):
+            verification = verify_paystack_payment(reference)
+            if verification.get("status") and verification.get("data", {}).get("status") == "success":
+                try:
+                    sb.table("public_listings").update({"status": "paid"}).eq("reference", reference).execute()
+                    clear_cache()
+                    st.toast(f"✅ Property Listing Published Live! Ref: {reference}", icon="🏠")
+                    st.success(f"✅ Payment for Property Listing (Ref: `{reference}`) verified! Listing is live on the public showcase.")
+                except Exception as e:
+                    logger.error(f"Error updating listing status: {e}")
+                    st.error(f"Error updating listing status: {e}")
+            else:
+                st.error("❌ Property listing payment verification failed or was cancelled.")
