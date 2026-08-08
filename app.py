@@ -1,5 +1,3 @@
---- START OF FILE Paste August 08, 2026 - 8:08AM ---
-
 """
 RentMaster-GH - Rental Property Management Web App
 Full interactive UI backed by Supabase. Manages properties, tenants,
@@ -10,6 +8,7 @@ Persistent Cookie Sessions: Retains user login across code reboots & closed tabs
 """
 
 import json
+import logging
 import os
 import uuid
 from datetime import date, datetime, timedelta
@@ -18,6 +17,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import extra_streamlit_components as stx
 from dotenv import load_dotenv
+from fpdf import FPDF
 from supabase import create_client
 from streamlit.errors import StreamlitSecretNotFoundError
 
@@ -33,6 +33,12 @@ st.set_page_config(
 
 # Load environment variables
 load_dotenv()
+
+# ---------------------------------------------------------------------------
+# Logging Setup
+# ---------------------------------------------------------------------------
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("RentMaster")
 
 # ---------------------------------------------------------------------------
 # Persistent Cookie Manager Setup (Direct Instantiation - NO Cache Decorator)
@@ -216,15 +222,6 @@ def fmt_date(v):
 
 
 # ---------------------------------------------------------------------------
-# Logging Setup
-# ---------------------------------------------------------------------------
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("RentMaster")
-
-
-# ---------------------------------------------------------------------------
 # Data Fetching Helpers (STRICT & SECURE DATABASE-LEVEL FILTERING)
 # ---------------------------------------------------------------------------
 @st.cache_data(ttl=10)
@@ -330,6 +327,16 @@ def fetch_ads():
     except Exception as e:
         logger.error(f"Failed to fetch ads: {e}", exc_info=True)
         return []
+
+
+def clear_cache():
+    fetch_properties.clear()
+    fetch_landlords.clear()
+    fetch_tenants.clear()
+    fetch_payments.clear()
+    fetch_leases.clear()
+    fetch_maintenance.clear()
+    fetch_ads.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -1038,55 +1045,97 @@ def compute_tenant_ledger(tenant: dict, all_payments: list):
     }
 
 
-def generate_receipt_html(tenant: dict, payment: dict, property_obj: dict = None):
+# ---------------------------------------------------------------------------
+# Professional PDF Receipt Generator
+# ---------------------------------------------------------------------------
+def generate_receipt_pdf(tenant: dict, payment: dict, property_obj: dict = None) -> bytes:
+    """
+    Generates a professional, print-ready PDF Rent Receipt.
+    Returns binary PDF bytes suitable for Streamlit download buttons.
+    """
     tenant = tenant if isinstance(tenant, dict) else {}
     payment = payment if isinstance(payment, dict) else {}
     property_obj = property_obj if isinstance(property_obj, dict) else {}
 
     amount_str = fmt_money(payment.get("amount", 0))
     p_date = fmt_date(payment.get("payment_date"))
-    p_ref = payment.get("notes") or payment.get("id", "N/A")
+    p_ref = payment.get("notes") or str(payment.get("id", "N/A"))[:12]
     t_name = tenant.get("name", "Valued Tenant")
     p_name = prop_label(property_obj) if property_obj else "RentMaster-GH Property"
+    p_method = str(payment.get("payment_method") or "online_paystack").replace("_", " ").title()
 
-    receipt_html = f"""
-    <div style="border: 2px solid #0f4c75; padding: 25px; border-radius: 12px; background-color: #ffffff; color: #1e293b; max-width: 600px; margin: 0 auto; font-family: sans-serif;">
-        <div style="text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px;">
-            <h2 style="color: #0f4c75; margin: 0;">RentMaster-GH Official Receipt</h2>
-            <p style="color: #64748b; margin: 5px 0 0 0; font-size: 0.9rem;">Proof of Rent Payment</p>
-        </div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
-            <tr>
-                <td style="padding: 8px 0; color: #64748b;">Receipt Reference:</td>
-                <td style="padding: 8px 0; text-align: right; font-weight: bold;">{p_ref}</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px 0; color: #64748b;">Payment Date:</td>
-                <td style="padding: 8px 0; text-align: right; font-weight: bold;">{p_date}</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px 0; color: #64748b;">Tenant Name:</td>
-                <td style="padding: 8px 0; text-align: right; font-weight: bold;">{t_name}</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px 0; color: #64748b;">Property:</td>
-                <td style="padding: 8px 0; text-align: right; font-weight: bold;">{p_name}</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px 0; color: #64748b;">Payment Method:</td>
-                <td style="padding: 8px 0; text-align: right; font-weight: bold;">{str(payment.get('payment_method') or 'Paystack').replace('_', ' ').title()}</td>
-            </tr>
-            <tr style="border-top: 2px solid #e2e8f0; border-bottom: 2px solid #e2e8f0;">
-                <td style="padding: 15px 0; font-size: 1.1rem; font-weight: bold; color: #0f4c75;">Amount Paid:</td>
-                <td style="padding: 15px 0; text-align: right; font-size: 1.3rem; font-weight: bold; color: #166534;">{amount_str}</td>
-            </tr>
-        </table>
-        <div style="text-align: center; margin-top: 25px; color: #94a3b8; font-size: 0.8rem;">
-            Thank you for your payment! Powered by RentMaster-GH.
-        </div>
-    </div>
-    """
-    return receipt_html
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # Header Banner Background (#0f4c75)
+    pdf.set_fill_color(15, 76, 117)
+    pdf.rect(0, 0, 210, 35, 'F')
+
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_xy(10, 8)
+    pdf.cell(0, 10, "RentMaster-GH Official Receipt", ln=True, align="C")
+
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(187, 222, 251)
+    pdf.cell(0, 6, "Proof of Rent Payment", ln=True, align="C")
+
+    pdf.ln(15)
+
+    # Details Box
+    pdf.set_draw_color(226, 232, 240)
+    pdf.set_fill_color(248, 250, 252)
+    pdf.rect(15, 45, 180, 110, 'DF')
+
+    pdf.set_xy(20, 52)
+    pdf.set_text_color(30, 41, 59)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "TRANSACTION DETAILS", ln=True)
+
+    pdf.set_font("Helvetica", "", 10)
+    pdf.ln(2)
+
+    details = [
+        ("Receipt Reference:", p_ref),
+        ("Payment Date:", p_date),
+        ("Tenant Name:", t_name),
+        ("Property Address:", p_name),
+        ("Payment Method:", p_method),
+    ]
+
+    for label, val in details:
+        pdf.set_x(20)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(100, 116, 139)
+        pdf.cell(50, 7, label, ln=False)
+
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(100, 7, str(val), ln=True)
+
+    pdf.ln(5)
+
+    # Highlighted Amount Box (#f0fdf4)
+    pdf.set_fill_color(240, 253, 244)
+    pdf.rect(20, 115, 170, 18, 'F')
+
+    pdf.set_xy(25, 119)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(15, 76, 117)
+    pdf.cell(50, 10, "AMOUNT PAID:", ln=False)
+
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(22, 101, 52)
+    pdf.cell(100, 10, amount_str, ln=True)
+
+    # Footer Notice
+    pdf.set_xy(10, 175)
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_text_color(148, 163, 184)
+    pdf.cell(0, 10, "Thank you for your payment! Powered by RentMaster-GH System.", align="C")
+
+    return bytes(pdf.output())
 
 
 def upload_id_to_supabase(file_obj, identifier: str, folder: str = "tenants"):
@@ -1925,14 +1974,18 @@ def page_payments():
                         with c_rec:
                             if p.get("status") == "paid":
                                 prop_obj = t_obj.get("properties") if (t_obj and isinstance(t_obj, dict)) else None
-                                receipt_html = generate_receipt_html(t_obj or {}, p, prop_obj)
-                                st.download_button(
-                                    "🧾 Receipt",
-                                    data=receipt_html,
-                                    file_name=f"RentReceipt_{fmt_date(p.get('payment_date'))}_{p.get('id')[:6]}.html",
-                                    mime="text/html",
-                                    key=f"rec_btn_{p['id']}"
-                                )
+                                try:
+                                    pdf_bytes = generate_receipt_pdf(t_obj or {}, p, prop_obj)
+                                    st.download_button(
+                                        "📄 PDF Receipt",
+                                        data=pdf_bytes,
+                                        file_name=f"RentReceipt_{fmt_date(p.get('payment_date'))}_{p.get('id')[:6]}.pdf",
+                                        mime="application/pdf",
+                                        key=f"rec_btn_{p['id']}"
+                                    )
+                                except Exception as e:
+                                    logger.error(f"Error generating PDF receipt for payment '{p['id']}': {e}", exc_info=True)
+                                    st.caption("PDF Error")
                         with c_del:
                             if st.button("Delete", key=f"del_pay_{p['id']}", type="secondary"):
                                 if sb:
