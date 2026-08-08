@@ -26,7 +26,7 @@ from ui.tenant_portal import render_tenant_portal
 # Streamlit Config (MUST BE FIRST)
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="RentMaster-GH",
+    page_title="RentMaster-GH | Rental Property Management System",
     page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -83,41 +83,138 @@ if sb and "code" in st.query_params:
 
 
 # ---------------------------------------------------------------------------
-# Authentication Screen with Integrated Sponsor Showcase
+# Beautiful & Modern Authentication Screen
 # ---------------------------------------------------------------------------
 def auth_page():
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # 2-Column Layout: Login/Signup Card (Left) + Subtle Sponsor Showcase (Right)
-    login_col, ad_showcase_col = st.columns([1.2, 1])
+    # Inject Custom Modern CSS for Auth Screen
+    st.markdown(
+        """
+        <style>
+            .auth-hero-banner {
+                background: linear-gradient(135deg, #0f4c75 0%, #1b262c 50%, #3282b8 100%);
+                padding: 2.2rem 2rem;
+                border-radius: 16px;
+                text-align: center;
+                color: white;
+                margin-bottom: 2rem;
+                box-shadow: 0 12px 30px rgba(15, 76, 117, 0.18);
+            }
+            .auth-hero-banner h1 {
+                color: #ffffff !important;
+                font-size: 2.3rem !important;
+                font-weight: 800 !important;
+                margin-bottom: 0.4rem !important;
+                letter-spacing: -0.5px;
+            }
+            .auth-hero-banner p {
+                color: #e0f2fe !important;
+                font-size: 1.05rem !important;
+                margin: 0 !important;
+                font-weight: 400;
+            }
+            .paystack-quick-banner {
+                background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+                border: 1px solid #a7f3d0;
+                border-radius: 12px;
+                padding: 1.1rem;
+                text-align: center;
+                margin-bottom: 1.2rem;
+            }
+            .paystack-quick-banner p {
+                color: #065f46;
+                font-weight: 600;
+                font-size: 0.9rem;
+                margin-bottom: 0.6rem;
+            }
+            .paystack-quick-btn {
+                display: inline-block;
+                background-color: #059669;
+                color: white !important;
+                font-weight: 700;
+                padding: 10px 22px;
+                border-radius: 8px;
+                text-decoration: none;
+                font-size: 0.9rem;
+                box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+                transition: all 0.2s ease;
+            }
+            .paystack-quick-btn:hover {
+                background-color: #047857;
+                transform: translateY(-1px);
+            }
+            .feature-pill {
+                display: inline-block;
+                background-color: #f1f5f9;
+                border: 1px solid #e2e8f0;
+                color: #334155;
+                font-size: 0.8rem;
+                font-weight: 600;
+                padding: 6px 12px;
+                border-radius: 20px;
+                margin-right: 6px;
+                margin-bottom: 8px;
+            }
+            .trust-bar {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 1.8rem;
+                margin-top: 2rem;
+                padding-top: 1.2rem;
+                border-top: 1px solid #e2e8f0;
+                color: #64748b;
+                font-size: 0.85rem;
+                font-weight: 500;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
+    # HERO HEADER BANNER
+    st.markdown(
+        """
+        <div class="auth-hero-banner">
+            <h1>🏠 RentMaster-GH Enterprise</h1>
+            <p>Smart Rental Property Management System &middot; Split Payouts &middot; Ghana Rent Cards &middot; KYC Verification</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # 2-COLUMN LAYOUT: Auth Form (Left 1.2) + Partner Showcase (Right 1.0)
+    login_col, ad_showcase_col = st.columns([1.2, 1], gap="large")
+
+    # LEFT COLUMN: AUTHENTICATION CARD
     with login_col:
         with st.container(border=True):
-            # Public Paystack Payment / Support Banner
+            # Quick Paystack Direct Payment Banner
             st.markdown(
                 """
-                <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.9rem; margin-bottom: 1rem; text-align: center;">
-                    <p style="margin: 0 0 0.4rem 0; font-weight: 600; color: #166534; font-size: 0.88rem;">Looking to make a payment or support without logging in?</p>
-                    <a href="https://paystack.shop/pay/zvx0npq7hv" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #09a5db; color: #ffffff; font-weight: 600; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 0.88rem;">💙 Make a Payment / Donation via Paystack</a>
+                <div class="paystack-quick-banner">
+                    <p>💡 Tenant or Sponsor making a payment without logging in?</p>
+                    <a href="https://paystack.shop/pay/zvx0npq7hv" target="_blank" rel="noopener noreferrer" class="paystack-quick-btn">
+                        💙 Quick Pay / Support via Paystack
+                    </a>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-            st.markdown("<h2 style='text-align: center; margin-bottom: 1rem;'>RentMaster-GH</h2>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center; margin-bottom: 1rem; color: #0f4c75;'>Account Sign In</h3>", unsafe_allow_html=True)
 
             tab1, tab2 = st.tabs(["🔒 Log In", "📝 Sign Up"])
             redirect_url = "https://www.rentmastergh.com"
 
             # TAB 1: LOG IN
             with tab1:
-                email = st.text_input("Email", key="login_email")
+                email = st.text_input("Email Address", key="login_email", placeholder="property_manager@example.com")
                 password = st.text_input("Password", type="password", key="login_pw")
-                remember_me = st.checkbox("Remember Me", value=True, key="login_remember_me")
+                remember_me = st.checkbox("Keep me logged in (30 Days)", value=True, key="login_remember_me")
 
-                if st.button("Log In", use_container_width=True, key="login_btn", type="primary"):
+                if st.button("Log In to Dashboard", use_container_width=True, key="login_btn", type="primary"):
                     if not sb:
-                        st.error("Database connection missing.")
+                        st.error("Database connection missing. Check environment setup.")
                     else:
                         try:
                             res = sb.auth.sign_in_with_password({"email": email, "password": password})
@@ -152,7 +249,7 @@ def auth_page():
                         if res.url:
                             st.markdown(
                                 f"""
-                                <a href="{res.url}" target="_self" style="display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; background-color: white; color: #3c4043; font-weight: 500; text-decoration: none; box-sizing: border-box; font-size: 0.9rem;">
+                                <a href="{res.url}" target="_self" style="display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 11px; border: 1px solid #dadce0; border-radius: 8px; background-color: white; color: #3c4043; font-weight: 600; text-decoration: none; box-sizing: border-box; font-size: 0.92rem; shadow: 0 2px 4px rgba(0,0,0,0.05);">
                                     <img src="https://www.gstatic.com/images/branding/product/1x/gsa_64dp.png" width="18" height="18"> Continue with Google
                                 </a>
                                 """,
@@ -163,34 +260,64 @@ def auth_page():
 
             # TAB 2: SIGN UP
             with tab2:
-                new_email = st.text_input("Email Address", key="signup_email")
+                new_email = st.text_input("Work Email Address", key="signup_email", placeholder="new_manager@example.com")
                 confirm_email = st.text_input("Confirm Email Address", key="confirm_email")
-                new_password = st.text_input("Password", type="password", key="signup_pw")
+                new_password = st.text_input("Create Password", type="password", key="signup_pw")
                 confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pw")
 
-                if st.button("Create Account", use_container_width=True, key="signup_btn", type="primary"):
+                if st.button("Create Property Manager Account", use_container_width=True, key="signup_btn", type="primary"):
                     if new_email != confirm_email:
-                        st.error("Emails do not match")
+                        st.error("Email addresses do not match.")
                     elif new_password != confirm_password:
-                        st.error("Passwords do not match")
+                        st.error("Passwords do not match.")
                     elif len(new_password) < 6:
-                        st.error("Password must be at least 6 characters long")
+                        st.error("Password must be at least 6 characters long.")
                     elif not sb:
                         st.error("Database connection missing.")
                     else:
                         try:
                             sb.auth.sign_up({"email": new_email, "password": new_password})
-                            st.success("✅ Account created! Check your email to confirm registration.")
+                            st.success("✅ Account created! Check your email inbox to confirm registration.")
                         except Exception as e:
                             st.error(f"Sign Up Error: {e}")
 
-    # RIGHT COLUMN: SUBTLE SPONSOR SHOWCASE
+    # RIGHT COLUMN: PLATFORM FEATURES & SPONSOR SHOWCASE
     with ad_showcase_col:
+        # Platform Feature Badges
+        with st.container(border=True):
+            st.markdown("#### ⚡ Platform Capabilities")
+            st.markdown(
+                """
+                <div style="margin-bottom: 0.5rem;">
+                    <span class="feature-pill">💳 Paystack Split Payouts</span>
+                    <span class="feature-pill">📋 Ghana Rent Cards</span>
+                    <span class="feature-pill">🆔 Live Camera KYC</span>
+                    <span class="feature-pill">📱 WhatsApp Reminders</span>
+                    <span class="feature-pill">📄 PDF Rent Receipts</span>
+                    <span class="feature-pill">🌍 Multi-Currency (GHS/USD/EUR)</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Subtle Paid Sponsor Showcase
         st.markdown("#### 🌟 Featured Partners & Services")
         st.caption("Services recommended for property managers, landlords, and tenants across Ghana & West Africa.")
-        
-        # Render subtle paid sponsor banners
         render_public_ad_banners(ad_slot="Login Page Sidebar Banner")
+
+    # TRUST & SECURITY BADGES BAR
+    st.markdown(
+        """
+        <div class="trust-bar">
+            <span>🔒 256-Bit SSL Encrypted</span>
+            <span>🛡️ Data Protection Act (Act 843) Compliant</span>
+            <span>⚡ Powered by Supabase & Paystack</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 # Stop unauthenticated users from accessing app dashboard
