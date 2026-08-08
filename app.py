@@ -151,6 +151,26 @@ def auth_page():
                 background-color: #047857;
                 transform: translateY(-1px);
             }
+            
+            /* TARGETED GREEN STYLING FOR LAUNCH ADVERT BUTTON */
+            div[data-testid="stButton"] button:has(p:contains("Launch Advert")),
+            div[data-testid="stButton"] button:has(span:contains("Launch Advert")),
+            div[data-testid="stButton"] button:has(div:contains("Launch Advert")) {
+                background-color: #16a34a !important;
+                border-color: #16a34a !important;
+                color: #ffffff !important;
+                font-weight: 700 !important;
+                box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3) !important;
+            }
+            div[data-testid="stButton"] button:has(p:contains("Launch Advert")):hover,
+            div[data-testid="stButton"] button:has(span:contains("Launch Advert")):hover,
+            div[data-testid="stButton"] button:has(div:contains("Launch Advert")):hover {
+                background-color: #15803d !important;
+                border-color: #15803d !important;
+                color: #ffffff !important;
+                transform: translateY(-1px) !important;
+            }
+
             .feature-pill {
                 display: inline-block;
                 background-color: #f1f5f9;
