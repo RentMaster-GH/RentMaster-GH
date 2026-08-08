@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from services.database import sb
 from components.property_condition import render_tenant_condition_approval_widget
+from components.agreements import render_tenant_agreement_acceptance_widget
 
 # ---------------------------------------------------------------------------
 # SAFE FALLBACK IMPORT FOR PAYSTACK FUNCTIONS
@@ -122,7 +123,17 @@ def record_payment_intent(lease_id, tenant_email, amount, payment_type, ref):
 def render_comprehensive_rent_payment_widget(user):
     """Renders the Full / Installment Payment UI for Tenants."""
     
-    # 1. PRE-PAYMENT CHECK: Property Condition Inspection & Acceptance
+    # 1. PRE-PAYMENT CHECK A: Tenancy Agreement Review & Acceptance
+    agreement_approved = render_tenant_agreement_acceptance_widget(user)
+
+    st.divider()
+
+    # Lock payment form if tenant has not accepted tenancy agreement
+    if not agreement_approved:
+        st.info("🔒 **Rent Payments Locked:** Please review and accept the Tenancy Agreement above to unlock payments.")
+        return
+
+    # 2. PRE-PAYMENT CHECK B: Property Condition Inspection & Acceptance
     condition_approved = render_tenant_condition_approval_widget(user)
 
     st.divider()
