@@ -318,7 +318,7 @@ def auth_page():
     with ad_showcase_col:
         with st.container(border=True):
             st.markdown("#### 📢 Promote & List Properties")
-            st.caption("Promote your business or list your vacant property for rent (GH₵ 50 / $5) to visitors across Ghana.")
+            st.caption("Promote your business or list your vacant property for rent (GH₵ 50 / $5) to visitors across the world.")
             
             c_btn1, c_btn2, c_btn3 = st.columns(3)
             with c_btn1:
