@@ -36,12 +36,14 @@ components.html(
             if (!window.parent.document.getElementById('ga-gtag-js')) {
                 var script = window.parent.document.createElement('script');
                 script.id = 'ga-gtag-js';
+                script.type = 'text/javascript';
                 script.async = true;
                 script.src = 'https://www.googletagmanager.com/gtag/js?id=G-4SEHLP8VTN';
                 head.appendChild(script);
 
                 var inlineScript = window.parent.document.createElement('script');
                 inlineScript.id = 'ga-gtag-init';
+                inlineScript.type = 'text/javascript';
                 inlineScript.innerHTML = `
                     window.dataLayer = window.dataLayer || [];
                     function gtag(){dataLayer.push(arguments);}
@@ -94,24 +96,20 @@ try:
 except Exception:
     cookie_manager = None
 
-
 def safe_get_cookie(cookie_name):
     if not cookie_manager: return None
     try: return cookie_manager.get(cookie=cookie_name)
     except Exception: return None
-
 
 def safe_set_cookie(cookie_name, value, expires_at):
     if not cookie_manager: return
     try: cookie_manager.set(cookie_name, value, expires_at=expires_at)
     except Exception: pass
 
-
 def safe_delete_cookie(cookie_name):
     if not cookie_manager: return
     try: cookie_manager.delete(cookie_name)
     except Exception: pass
-
 
 # Initialize Session State Defaults
 if "user" not in st.session_state:
@@ -152,11 +150,9 @@ if sb and "code" in st.query_params:
     except Exception:
         pass
 
-
 @st.dialog("📢 Self-Service Sponsor & Advertiser Hub", width="large")
 def show_public_sponsor_launch_dialog():
     render_sponsor_portal()
-
 
 # ---------------------------------------------------------------------------
 # Role-Aware Authentication Screen
@@ -434,7 +430,6 @@ def auth_page():
         """,
         unsafe_allow_html=True
     )
-
 
 # Stop unauthenticated users from accessing app dashboard
 if st.session_state.get("user") is None:
