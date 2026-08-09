@@ -293,7 +293,7 @@ def auth_page():
                 new_password = st.text_input("Create Password", type="password", key="signup_pw")
                 confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pw")
 
-                # ACCOUNT TYPE SELECTION BOX WITH 3 CLEAR ROLES
+                # ACCOUNT TYPE SELECTION BOX WITH 3 ROLES
                 role_choice = st.radio(
                     "Account Type / Role *",
                     [
@@ -389,20 +389,24 @@ if st.session_state.get("user") is None:
 
 
 # ---------------------------------------------------------------------------
-# STRICT ROLE-BASED NAVIGATION ROUTER
+# STRICT ROLE-BASED NAVIGATION ROUTER WITH VIEW MODE SWITCHER
 # ---------------------------------------------------------------------------
 active_user = st.session_state.get("user")
 user_role = get_user_role(active_user)
+override_mode = st.session_state.get("user_role_override")
 
-# Strictly define allowed navigation items per role
-if user_role == "tenant":
+# Determine Active View Role
+active_view_role = override_mode if override_mode else user_role
+
+# Strictly define allowed navigation items per active view
+if active_view_role in ["tenant", "prospective_tenant"]:
     PAGES = {
         "Tenant Portal": render_tenant_portal,
         "User Profile": page_user_profile,
         "Settings": page_settings,
         "Sponsor Portal": render_sponsor_portal,
     }
-else:  # Landlord / Property Manager View ('Maintenance' EXCLUDED)
+else:  # Landlord / Property Manager View
     PAGES = {
         "Dashboard": page_dashboard,
         "User Profile": page_user_profile,
@@ -418,21 +422,43 @@ else:  # Landlord / Property Manager View ('Maintenance' EXCLUDED)
 # Auto-set default page if none selected or invalid for current role
 nav_keys = list(PAGES.keys())
 if "current_page" not in st.session_state or st.session_state["current_page"] not in nav_keys:
-    st.session_state["current_page"] = "Tenant Portal" if user_role == "tenant" else "Dashboard"
+    st.session_state["current_page"] = "Tenant Portal" if active_view_role in ["tenant", "prospective_tenant"] else "Dashboard"
 
 with st.sidebar:
-    st.markdown(f"### Navigation ({user_role.title()} View)")
+    st.markdown(f"### Navigation ({active_view_role.replace('_', ' ').title()} View)")
     
     default_index = nav_keys.index(st.session_state["current_page"])
     selection = st.radio("Go to", nav_keys, index=default_index)
     st.session_state["current_page"] = selection
 
-    # 1-CLICK ROLE VIEW SWITCHER
+    # 3-WAY VIEW MODE SWITCHER (LANDLORD, ACTIVE TENANT, PROSPECTIVE TENANT)
     st.markdown("---")
-    st.caption("🔄 Switch View Mode")
-    target_switch = "landlord" if user_role == "tenant" else "tenant"
-    if st.button(f"Switch to {target_switch.title()} View", use_container_width=True, type="secondary"):
-        st.session_state["user_role_override"] = target_switch
+    st.caption("🔄 Switch Active View Mode")
+
+    view_modes = [
+        "🏠 Landlord / Manager View",
+        "👤 Active Tenant View",
+        "🔍 Prospective Tenant View"
+    ]
+
+    current_mode_idx = 0
+    if active_view_role == "prospective_tenant":
+        current_mode_idx = 2
+    elif active_view_role == "tenant":
+        current_mode_idx = 1
+
+    selected_mode = st.selectbox("Select View Mode", view_modes, index=current_mode_idx, key="active_view_mode_select")
+
+    if "Prospective" in selected_mode and override_mode != "prospective_tenant":
+        st.session_state["user_role_override"] = "prospective_tenant"
+        st.session_state.pop("current_page", None)
+        st.rerun()
+    elif "Active Tenant" in selected_mode and override_mode != "tenant":
+        st.session_state["user_role_override"] = "tenant"
+        st.session_state.pop("current_page", None)
+        st.rerun()
+    elif "Landlord" in selected_mode and override_mode is not None:
+        st.session_state.pop("user_role_override", None)
         st.session_state.pop("current_page", None)
         st.rerun()
 
@@ -443,7 +469,7 @@ with st.sidebar:
     
     if active_user:
         st.write(f"👤 Logged in: **{getattr(active_user, 'email', 'User')}**")
-        st.caption(f"Active View: `{user_role.title()}`")
+        st.caption(f"Active View: `{active_view_role.replace('_', ' ').title()}`")
         if st.button("Logout", key="logout_btn"):
             safe_delete_cookie("rentmaster_session")
             if sb: sb.auth.sign_out()
