@@ -28,25 +28,40 @@ logger = logging.getLogger("RentMaster")
 
 def page_properties():
     header()
-    st.subheader("Properties")
+    st.subheader("Properties & Facility Disclosures")
     curr_code = get_current_currency()
     user_id, user_email = get_active_user_info()
 
-    with st.expander("Add New Property", expanded=False):
+    with st.expander("➕ Add New Property & Facility Disclosures", expanded=False):
         with st.form("add_property"):
             col1, col2 = st.columns(2)
             with col1:
-                name = st.text_input("Property Name *")
-                address = st.text_input("Address / Location *")
-                rent = st.number_input(f"Monthly Rent ({curr_code})", min_value=0.0, value=0.0, step=50.0)
+                name = st.text_input("Property Name *", placeholder="e.g. Airport Executive Flat #2B")
+                address = st.text_input("Address / Location *", placeholder="e.g. Airport Residential Area, Accra")
+                rent = st.number_input(f"Monthly Rent ({curr_code}) *", min_value=0.0, value=0.0, step=50.0)
             with col2:
-                ptype = st.selectbox("Property Type", ["apartment", "house", "commercial", "other"])
-                beds = st.number_input("Bedrooms", min_value=0, value=0)
-                baths = st.number_input("Bathrooms", min_value=0, value=0)
-            desc = st.text_area("Description")
-            is_occupied = st.checkbox("Is Occupied", value=False)
+                ptype = st.selectbox("Property Type *", ["Apartment", "House", "Commercial / Office", "Studio / Chamber & Hall"])
+                beds = st.number_input("Bedrooms", min_value=0, value=1)
+                baths = st.number_input("Bathrooms", min_value=0, value=1)
 
-            if st.form_submit_button("Add Property"):
+            desc = st.text_area("General Description & Features", placeholder="Describe amenities, security, parking...")
+
+            st.markdown("---")
+            st.markdown("#### 🏘️ Shared Facilities & Compound Disclosures (Viewed by Prospective Tenants)")
+            st.caption("Disclose shared utilities and occupancy arrangements to prospective tenants before they rent.")
+
+            col_s1, col_s2 = st.columns(2)
+            with col_s1:
+                shared_washroom = st.checkbox("🚿 Washroom / Toilet is SHARED with other occupants", value=False)
+                shared_electricity = st.checkbox("⚡ Electricity Usage / Meter is SHARED with other occupants", value=False)
+                shared_water = st.checkbox("💧 Water Supply / Meter is SHARED with other occupants", value=False)
+
+            with col_s2:
+                shared_compound = st.checkbox("🏡 Compound & Living Space is SHARED with other tenants", value=True)
+                landlord_resides = st.checkbox("🏠 Landlord RESIDES in a separate unit on the SAME compound", value=False)
+                is_occupied = st.checkbox("Is Currently Occupied", value=False)
+
+            if st.form_submit_button("💾 Save & Publish Property Listing", type="primary", use_container_width=True):
                 if not name or not address:
                     st.error("Property name and address are required.")
                 elif not sb:
@@ -56,13 +71,18 @@ def page_properties():
                         "name": name, "address": address, "monthly_rent": float(rent),
                         "property_type": ptype, "bedrooms": int(beds), "bathrooms": int(baths),
                         "is_occupied": is_occupied, "description": desc,
+                        "shared_washroom": shared_washroom,
+                        "shared_electricity": shared_electricity,
+                        "shared_water": shared_water,
+                        "shared_compound": shared_compound,
+                        "landlord_resides_on_compound": landlord_resides
                     }
                     if user_id: payload["user_id"] = user_id
                     if user_email: payload["user_email"] = user_email
 
                     sb.table("properties").insert(payload).execute()
                     clear_cache()
-                    st.success(f"Property '{name}' added.")
+                    st.success(f"✅ Property '{name}' and facility disclosures published!")
                     st.rerun()
 
     props = fetch_properties(user_id, user_email)
@@ -71,7 +91,7 @@ def page_properties():
         return
 
     st.markdown("---")
-    st.markdown(f"**{len(props)} Properties**")
+    st.markdown(f"**{len(props)} Properties Registered**")
     for p in props:
         with st.container(border=True):
             col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
@@ -89,6 +109,13 @@ def page_properties():
                         sb.table("properties").delete().eq("id", p["id"]).execute()
                         clear_cache()
                         st.rerun()
+
+            # Disclosures view
+            with st.expander("🏘️ Facility Disclosures & Occupancy Rules", expanded=False):
+                st.write(f"• **Washroom:** {'Shared' if p.get('shared_washroom') else 'Private'}")
+                st.write(f"• **Electricity Meter:** {'Shared' if p.get('shared_electricity') else 'Private'}")
+                st.write(f"• **Water Supply:** {'Shared' if p.get('shared_water') else 'Private'}")
+                st.write(f"• **Landlord Residence:** {'Resides on same compound' if p.get('landlord_resides_on_compound') else 'Resides off-site'}")
 
             # Pre-Move-In Property Condition & Photos Management Portal
             with st.expander("📸 Property Pre-Move-In Condition Photos & Report", expanded=False):
