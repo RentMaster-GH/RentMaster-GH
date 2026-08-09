@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import streamlit as st
 import extra_streamlit_components as stx
 
-# 3. Streamlit Config (MUST BE CALLED BEFORE LOCAL UI/COMPONENT IMPORTS)
+# 3. Streamlit Config (MUST BE CALLED BEFORE ANY OTHER STREAMLIT COMMANDS OR LOCAL UI IMPORTS)
 st.set_page_config(
     page_title="RentMaster-GH | Rental Property Management System",
     page_icon="🏠",
@@ -44,6 +44,10 @@ from ui.pages_management import (
 from ui.tenant_portal import render_tenant_portal
 from ui.sponsor_portal import render_sponsor_portal, show_sponsor_support_dialog
 
+# 5. Inject Google Analytics & Site Verification
+inject_google_analytics("G-EFD2P6FKM5")
+inject_google_site_verification("SXu9dztavBBjKgrko60Tx2CjufX2KvyRhW42SOczZrc")
+
 # Cookie Manager Instance
 try:
     cookie_manager = stx.CookieManager(key="rentmaster_cookie_mgr")
@@ -68,10 +72,6 @@ def safe_delete_cookie(cookie_name):
     try: cookie_manager.delete(cookie_name)
     except Exception: pass
 
-
-# Inject Google Analytics & Site Verification
-inject_google_analytics("G-EFD2P6FKM5")
-inject_google_site_verification("SXu9dztavBBjKgrko60Tx2CjufX2KvyRhW42SOczZrc")
 
 # Initialize Session State Defaults
 if "user" not in st.session_state:
