@@ -293,10 +293,15 @@ def auth_page():
                 new_password = st.text_input("Create Password", type="password", key="signup_pw")
                 confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pw")
 
+                # UPDATED ACCOUNT TYPE SELECTION BOX WITH 3 CLEAR ROLES
                 role_choice = st.radio(
                     "Account Type / Role *",
-                    ["🏠 Landlord / Property Manager", "👤 Tenant"],
-                    horizontal=True,
+                    [
+                        "🏠 Landlord / Property Manager", 
+                        "🔍 Prospective Tenant (Looking for Property)",
+                        "👤 Active Tenant (Already Renting)"
+                    ],
+                    horizontal=False,
                     key="signup_role_choice"
                 )
                 selected_role = "landlord" if "Landlord" in role_choice else "tenant"
@@ -317,11 +322,12 @@ def auth_page():
                                 "password": new_password,
                                 "options": {
                                     "data": {
-                                        "role": selected_role
+                                        "role": selected_role,
+                                        "account_subtype": "prospective" if "Prospective" in role_choice else "active"
                                     }
                                 }
                             })
-                            st.success(f"✅ Account created as **{selected_role.title()}**! Check your email inbox to confirm registration.")
+                            st.success(f"✅ Account created as **{role_choice}**! Check your email inbox to confirm registration.")
                         except Exception as e:
                             st.error(f"Sign Up Error: {e}")
 
