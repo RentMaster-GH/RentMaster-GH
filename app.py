@@ -31,7 +31,7 @@ st.markdown("""
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', 'G-EFD2P6FKM5');
+  gtag('config', 'G-4SEHLP8VTN');
 </script>
 <!-- Google Site Verification -->
 <meta name="google-site-verification" content="vFWqfkLEFQARiYcF9r1M5FKhC6aQZD7P_LUli5fVN_M" />
