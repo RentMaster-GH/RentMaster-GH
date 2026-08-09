@@ -46,8 +46,7 @@ from ui.sponsor_portal import render_sponsor_portal, show_sponsor_support_dialog
 
 # 5. Inject Google Analytics & Site Verification Into Document <head>
 inject_google_analytics("G-EFD2P6FKM5")
-inject_google_site_verification("SXu9dztavBBjKgrko60Tx2CjufX2KvyRhW42SOczZrc")
-inject_google_site_verification("googlec00f3bc3597f0f8f")
+inject_google_site_verification("vFWqfkLEFQARiYcF9r1M5FKhC6aQZD7P_LUli5fVN_M")
 
 # Cookie Manager Instance
 try:
