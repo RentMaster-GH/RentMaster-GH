@@ -11,39 +11,75 @@ from streamlit.errors import StreamlitSecretNotFoundError
 # ---------------------------------------------------------------------------
 def inject_google_analytics(measurement_id="G-EFD2P6FKM5"):
     """
-    Injects Google Analytics 4 tracking snippet.
+    Injects Google Analytics 4 (gtag.js) tracking snippet directly into <head>.
+    Required for Google Analytics property tracking & site ownership verification.
     """
-    ga_html = f"""
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id={measurement_id}"></script>
+    if not measurement_id:
+        return
+
+    ga_script = f"""
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){{dataLayer.push(arguments);}}
-      gtag('js', new Date());
-      gtag('config', '{measurement_id}');
+        (function() {{
+            try {{
+                var parentHead = window.parent.document.head;
+                
+                // 1. Inject gtag.js script if not already present
+                if (!window.parent.document.getElementById('ga-gtag-js')) {{
+                    var script = window.parent.document.createElement('script');
+                    script.id = 'ga-gtag-js';
+                    script.async = true;
+                    script.src = 'https://www.googletagmanager.com/gtag/js?id={measurement_id}';
+                    parentHead.insertBefore(script, parentHead.firstChild);
+                }}
+                
+                // 2. Inject gtag initialization script if not already present
+                if (!window.parent.document.getElementById('ga-gtag-init')) {{
+                    var inlineScript = window.parent.document.createElement('script');
+                    inlineScript.id = 'ga-gtag-init';
+                    inlineScript.innerHTML = `
+                        window.dataLayer = window.dataLayer || [];
+                        function gtag(){{dataLayer.push(arguments);}}
+                        gtag('js', new Date());
+                        gtag('config', '{measurement_id}', {{
+                            'send_page_view': true
+                        }});
+                    `;
+                    parentHead.insertBefore(inlineScript, parentHead.children[1] || null);
+                }}
+            }} catch (e) {{
+                console.error("Google Analytics Head Injection Failed:", e);
+            }}
+        }})();
     </script>
     """
-    components.html(ga_html, height=0, width=0)
+    components.html(ga_script, height=0, width=0)
 
 
 def inject_google_site_verification(verification_code="SXu9dztavBBjKgrko60Tx2CjufX2KvyRhW42SOczZrc"):
     """
-    Injects Google Site Verification meta tag into the main browser document head.
+    Injects Google Site Verification meta tag directly into the browser document head.
     """
-    verification_js = f"""
+    if not verification_code:
+        return
+
+    verification_script = f"""
     <script>
-      (function() {{
-        const parentHead = window.parent.document.head;
-        if (!parentHead.querySelector('meta[name="google-site-verification"]')) {{
-          const meta = window.parent.document.createElement('meta');
-          meta.name = 'google-site-verification';
-          meta.content = '{verification_code}';
-          parentHead.appendChild(meta);
-        }}
-      }})();
+        (function() {{
+            try {{
+                var parentHead = window.parent.document.head;
+                if (!window.parent.document.querySelector('meta[name="google-site-verification"]')) {{
+                    var meta = window.parent.document.createElement('meta');
+                    meta.name = 'google-site-verification';
+                    meta.content = '{verification_code}';
+                    parentHead.insertBefore(meta, parentHead.firstChild);
+                }}
+            }} catch (e) {{
+                console.error("Google Site Verification Head Injection Failed:", e);
+            }}
+        }})();
     </script>
     """
-    components.html(verification_js, height=0, width=0)
+    components.html(verification_script, height=0, width=0)
 
 
 # ---------------------------------------------------------------------------
