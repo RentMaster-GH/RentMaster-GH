@@ -12,6 +12,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 2. Third-party library imports
 import streamlit as st
+import streamlit.components.v1 as components
 import extra_streamlit_components as stx
 
 # 3. Streamlit Config (MUST BE CALLED BEFORE ANY OTHER STREAMLIT COMMANDS OR LOCAL UI IMPORTS)
@@ -22,20 +23,50 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 3.5 INJECT GOOGLE ANALYTICS + SITE VERIFICATION INTO <head>
-# This must come right after set_page_config so Google can see it
-st.markdown("""
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-4SEHLP8VTN"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-4SEHLP8VTN');
-</script>
-<!-- Google Site Verification -->
-<meta name="google-site-verification" content="vFWqfkLEFQARiYcF9r1M5FKhC6aQZD7P_LUli5fVN_M" />
-""", unsafe_allow_html=True)
+# 3.5 INJECT GOOGLE ANALYTICS + SITE VERIFICATION INTO TOP-LEVEL <head>
+# Uses DOM injection to ensure scripts mount directly in window.parent.document.head
+components.html(
+    """
+    <script>
+    (function() {
+        try {
+            var head = window.parent.document.head;
+            
+            // 1. Inject Google Analytics gtag.js
+            if (!window.parent.document.getElementById('ga-gtag-js')) {
+                var script = window.parent.document.createElement('script');
+                script.id = 'ga-gtag-js';
+                script.async = true;
+                script.src = 'https://www.googletagmanager.com/gtag/js?id=G-4SEHLP8VTN';
+                head.appendChild(script);
+
+                var inlineScript = window.parent.document.createElement('script');
+                inlineScript.id = 'ga-gtag-init';
+                inlineScript.innerHTML = `
+                    window.dataLayer = window.dataLayer || [];
+                    function gtag(){dataLayer.push(arguments);}
+                    gtag('js', new Date());
+                    gtag('config', 'G-4SEHLP8VTN');
+                `;
+                head.appendChild(inlineScript);
+            }
+
+            // 2. Inject Google Site Verification Meta Tag
+            if (!window.parent.document.querySelector('meta[name="google-site-verification"]')) {
+                var meta = window.parent.document.createElement('meta');
+                meta.name = 'google-site-verification';
+                meta.content = 'vFWqfkLEFQARiYcF9r1M5FKhC6aQZD7P_LUli5fVN_M';
+                head.appendChild(meta);
+            }
+        } catch (e) {
+            console.error("Head Injection Error:", e);
+        }
+    })();
+    </script>
+    """,
+    height=0,
+    width=0,
+)
 
 # 4. Local application imports
 from services.helpers import get_user_role
@@ -63,20 +94,24 @@ try:
 except Exception:
     cookie_manager = None
 
+
 def safe_get_cookie(cookie_name):
     if not cookie_manager: return None
     try: return cookie_manager.get(cookie=cookie_name)
     except Exception: return None
+
 
 def safe_set_cookie(cookie_name, value, expires_at):
     if not cookie_manager: return
     try: cookie_manager.set(cookie_name, value, expires_at=expires_at)
     except Exception: pass
 
+
 def safe_delete_cookie(cookie_name):
     if not cookie_manager: return
     try: cookie_manager.delete(cookie_name)
     except Exception: pass
+
 
 # Initialize Session State Defaults
 if "user" not in st.session_state:
@@ -117,9 +152,11 @@ if sb and "code" in st.query_params:
     except Exception:
         pass
 
+
 @st.dialog("📢 Self-Service Sponsor & Advertiser Hub", width="large")
 def show_public_sponsor_launch_dialog():
     render_sponsor_portal()
+
 
 # ---------------------------------------------------------------------------
 # Role-Aware Authentication Screen
@@ -161,9 +198,8 @@ def auth_page():
                 text-decoration: none;
                 font-size: 0.9rem;
             }
-            div[data-testid="stButton"] button:has(p:contains("Launch Advert")),
-            div[data-testid="stFormSubmitButton"] button:has(p:contains("Log In to Account")),
-            div[data-testid="stButton"] button:has(p:contains("Log In to Account")) {
+            /* GREEN LOGIN BUTTON & ACCENT STYLING */
+            div[data-testid="stFormSubmitButton"] button {
                 background-color: #16a34a !important;
                 border-color: #16a34a !important;
                 color: #ffffff !important;
@@ -194,6 +230,13 @@ def auth_page():
                 font-weight: 500;
             }
         </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Autofill attributes helper script
+    components.html(
+        """
         <script>
             setTimeout(function() {
                 try {
@@ -205,7 +248,8 @@ def auth_page():
             }, 800);
         </script>
         """,
-        unsafe_allow_html=True
+        height=0,
+        width=0
     )
 
     st.markdown(
@@ -390,6 +434,7 @@ def auth_page():
         """,
         unsafe_allow_html=True
     )
+
 
 # Stop unauthenticated users from accessing app dashboard
 if st.session_state.get("user") is None:
