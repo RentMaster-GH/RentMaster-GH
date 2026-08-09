@@ -23,22 +23,62 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 3.5 GOOGLE TAG MANAGER + SITE VERIFICATION INJECTION
-# This injects GTM and Meta tag directly into window.parent.document.head for verification
+# 3.5 INJECT GTM + GOOGLE ANALYTICS + SITE VERIFICATION INTO TOP-LEVEL <head>
 components.html(
     """
-    <!-- Google Tag Manager -->
     <script>
-    (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-M8WLPHJW');
-    </script>
-    <!-- End Google Tag Manager -->
+    (function() {
+        try {
+            var head = window.parent.document.head;
+            
+            // 1. Inject Google Tag Manager (GTM-M8WLPHJW)
+            if (!window.parent.document.getElementById('gtm-script')) {
+                var gtmInit = window.parent.document.createElement('script');
+                gtmInit.id = 'gtm-init';
+                gtmInit.innerHTML = `
+                    window.dataLayer = window.dataLayer || [];
+                    window.dataLayer.push({'gtm.start': new Date().getTime(), event: 'gtm.js'});
+                `;
+                head.appendChild(gtmInit);
 
-    <!-- Google Site Verification -->
-    <meta name="google-site-verification" content="vFWqfkLEFQARiYcF9r1M5FKhC6aQZD7P_LUli5fVN_M" />
+                var gtmScript = window.parent.document.createElement('script');
+                gtmScript.id = 'gtm-script';
+                gtmScript.async = true;
+                gtmScript.src = 'https://www.googletagmanager.com/gtm.js?id=GTM-M8WLPHJW';
+                head.appendChild(gtmScript);
+            }
+
+            // 2. Inject Google Analytics 4 (G-4SEHLP8VTN)
+            if (!window.parent.document.getElementById('ga-gtag-js')) {
+                var gaScript = window.parent.document.createElement('script');
+                gaScript.id = 'ga-gtag-js';
+                gaScript.async = true;
+                gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-4SEHLP8VTN';
+                head.appendChild(gaScript);
+
+                var gaInit = window.parent.document.createElement('script');
+                gaInit.id = 'ga-gtag-init';
+                gaInit.innerHTML = `
+                    window.dataLayer = window.dataLayer || [];
+                    function gtag(){dataLayer.push(arguments);}
+                    gtag('js', new Date());
+                    gtag('config', 'G-4SEHLP8VTN');
+                `;
+                head.appendChild(gaInit);
+            }
+
+            // 3. Inject Google Site Verification Meta Tag
+            if (!window.parent.document.querySelector('meta[name="google-site-verification"]')) {
+                var meta = window.parent.document.createElement('meta');
+                meta.name = 'google-site-verification';
+                meta.content = 'vFWqfkLEFQARiYcF9r1M5FKhC6aQZD7P_LUli5fVN_M';
+                head.appendChild(meta);
+            }
+        } catch (e) {
+            console.error("Head Injection Error:", e);
+        }
+    })();
+    </script>
     """,
     height=0,
     width=0,
@@ -70,20 +110,24 @@ try:
 except Exception:
     cookie_manager = None
 
+
 def safe_get_cookie(cookie_name):
     if not cookie_manager: return None
     try: return cookie_manager.get(cookie=cookie_name)
     except Exception: return None
+
 
 def safe_set_cookie(cookie_name, value, expires_at):
     if not cookie_manager: return
     try: cookie_manager.set(cookie_name, value, expires_at=expires_at)
     except Exception: pass
 
+
 def safe_delete_cookie(cookie_name):
     if not cookie_manager: return
     try: cookie_manager.delete(cookie_name)
     except Exception: pass
+
 
 # Initialize Session State Defaults
 if "user" not in st.session_state:
@@ -124,9 +168,11 @@ if sb and "code" in st.query_params:
     except Exception:
         pass
 
+
 @st.dialog("📢 Self-Service Sponsor & Advertiser Hub", width="large")
 def show_public_sponsor_launch_dialog():
     render_sponsor_portal()
+
 
 # ---------------------------------------------------------------------------
 # Role-Aware Authentication Screen
@@ -135,7 +181,7 @@ def auth_page():
     st.markdown(
         """
         <style>
-           .auth-hero-banner {
+            .auth-hero-banner {
                 background: linear-gradient(135deg, #0f4c75 0%, #1b262c 50%, #3282b8 100%);
                 padding: 2.2rem 2rem;
                 border-radius: 16px;
@@ -144,13 +190,13 @@ def auth_page():
                 margin-bottom: 2rem;
                 box-shadow: 0 12px 30px rgba(15, 76, 117, 0.18);
             }
-           .auth-hero-banner h1 {
-                color: #ffffff!important;
-                font-size: 2.3rem!important;
-                font-weight: 800!important;
-                margin-bottom: 0.4rem!important;
+            .auth-hero-banner h1 {
+                color: #ffffff !important;
+                font-size: 2.3rem !important;
+                font-weight: 800 !important;
+                margin-bottom: 0.4rem !important;
             }
-           .paystack-quick-banner {
+            .paystack-quick-banner {
                 background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
                 border: 1px solid #a7f3d0;
                 border-radius: 12px;
@@ -158,10 +204,10 @@ def auth_page():
                 text-align: center;
                 margin-bottom: 1.2rem;
             }
-           .paystack-quick-btn {
+            .paystack-quick-btn {
                 display: inline-block;
                 background-color: #059669;
-                color: white!important;
+                color: white !important;
                 font-weight: 700;
                 padding: 10px 22px;
                 border-radius: 8px;
@@ -170,12 +216,12 @@ def auth_page():
             }
             /* GREEN LOGIN BUTTON & ACCENT STYLING */
             div[data-testid="stFormSubmitButton"] button {
-                background-color: #16a34a!important;
-                border-color: #16a34a!important;
-                color: #ffffff!important;
-                font-weight: 700!important;
+                background-color: #16a34a !important;
+                border-color: #16a34a !important;
+                color: #ffffff !important;
+                font-weight: 700 !important;
             }
-           .feature-pill {
+            .feature-pill {
                 display: inline-block;
                 background-color: #f1f5f9;
                 border: 1px solid #e2e8f0;
@@ -187,7 +233,7 @@ def auth_page():
                 margin-right: 6px;
                 margin-bottom: 8px;
             }
-           .trust-bar {
+            .trust-bar {
                 display: flex;
                 justify-content: center;
                 align-items: center;
@@ -286,7 +332,7 @@ def auth_page():
                                             "user_email": res.user.email
                                         })
                                         safe_set_cookie("rentmaster_session", cookie_data, expires_at=expires_at)
-
+                                    
                                     clear_cache()
                                     st.rerun()
                             except Exception as e:
@@ -321,7 +367,7 @@ def auth_page():
                 role_choice = st.radio(
                     "Account Type / Role *",
                     [
-                        "🏠 Landlord / Property Manager",
+                        "🏠 Landlord / Property Manager", 
                         "🔍 Prospective Tenant (Looking for Property)",
                         "👤 Active Tenant (Already Renting)"
                     ],
@@ -331,9 +377,9 @@ def auth_page():
                 selected_role = "landlord" if "Landlord" in role_choice else "tenant"
 
                 if st.button("Create Account", use_container_width=True, key="signup_btn", type="primary"):
-                    if new_email!= confirm_email:
+                    if new_email != confirm_email:
                         st.error("Email addresses do not match.")
-                    elif new_password!= confirm_password:
+                    elif new_password != confirm_password:
                         st.error("Passwords do not match.")
                     elif len(new_password) < 6:
                         st.error("Password must be at least 6 characters long.")
@@ -359,7 +405,7 @@ def auth_page():
         with st.container(border=True):
             st.markdown("#### 📢 Promote & List Properties")
             st.caption("Promote your business or list your vacant property for rent (GH₵ 50 / $5) to visitors across the world.")
-
+            
             c_btn1, c_btn2, c_btn3 = st.columns(3)
             with c_btn1:
                 if st.button("🚀 Launch Advert", use_container_width=True, type="primary"):
@@ -428,7 +474,7 @@ if active_view_role in ["tenant", "prospective_tenant"]:
         "Settings": page_settings,
         "Sponsor Portal": render_sponsor_portal,
     }
-else: # Landlord / Property Manager View
+else:  # Landlord / Property Manager View
     PAGES = {
         "Dashboard": page_dashboard,
         "User Profile": page_user_profile,
@@ -448,7 +494,7 @@ if "current_page" not in st.session_state or st.session_state["current_page"] no
 
 with st.sidebar:
     st.markdown(f"### Navigation ({active_view_role.replace('_', ' ').title()} View)")
-
+    
     default_index = nav_keys.index(st.session_state["current_page"])
     selection = st.radio("Go to", nav_keys, index=default_index)
     st.session_state["current_page"] = selection
@@ -471,11 +517,11 @@ with st.sidebar:
 
     selected_mode = st.selectbox("Select View Mode", view_modes, index=current_mode_idx, key="active_view_mode_select")
 
-    if "Prospective" in selected_mode and override_mode!= "prospective_tenant":
+    if "Prospective" in selected_mode and override_mode != "prospective_tenant":
         st.session_state["user_role_override"] = "prospective_tenant"
         st.session_state.pop("current_page", None)
         st.rerun()
-    elif "Active Tenant" in selected_mode and override_mode!= "tenant":
+    elif "Active Tenant" in selected_mode and override_mode != "tenant":
         st.session_state["user_role_override"] = "tenant"
         st.session_state.pop("current_page", None)
         st.rerun()
@@ -488,7 +534,7 @@ with st.sidebar:
     if st.button("💬 Support & Suggestions", use_container_width=True):
         show_support_dialog()
     st.markdown("---")
-
+    
     if active_user:
         st.write(f"👤 Logged in: **{getattr(active_user, 'email', 'User')}**")
         st.caption(f"Active View: `{active_view_role.replace('_', ' ').title()}`")
