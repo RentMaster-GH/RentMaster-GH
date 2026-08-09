@@ -1,12 +1,13 @@
 """
 RentMaster-GH - Public Property Discovery & Paid Advert Marketplace Portal
 Allows prospective tenants to search, filter, and inquire about paid property listings.
+Includes Shared Facilities & Occupancy Disclosures on all property cards.
 """
 import streamlit as st
 import json
 from services.database import sb
 
-# Demo Featured Property Adverts
+# Demo Featured Property Adverts with Disclosures
 DEFAULT_PAID_ADVERTS = [
     {
         "id": "ad_prop_1",
@@ -21,7 +22,12 @@ DEFAULT_PAID_ADVERTS = [
         "landlord_name": "Chief Kwame Appiah",
         "contact_phone": "+233200000001",
         "whatsapp_link": "https://wa.me/233200000001?text=Hi%2C%20I%20am%20interested%20in%20your%20East%20Legon%20Apartment%20advertised%20on%20RentMaster-GH.",
-        "description": "Spacious fully furnished apartment with air conditioning, 24/7 security, standby generator, and swimming pool access."
+        "description": "Spacious fully furnished apartment with air conditioning, 24/7 security, standby generator, and swimming pool access.",
+        "shared_washroom": False,
+        "shared_electricity": False,
+        "shared_water": False,
+        "shared_compound": True,
+        "landlord_resides_on_compound": False
     },
     {
         "id": "ad_prop_2",
@@ -36,7 +42,12 @@ DEFAULT_PAID_ADVERTS = [
         "landlord_name": "Madam Abena Osei",
         "contact_phone": "+2348000000002",
         "whatsapp_link": "https://wa.me/2348000000002?text=Hello%2C%20I%20saw%20your%20Lagos%20property%20listing%20on%20RentMaster-GH.",
-        "description": "Newly renovated residential home with fitted kitchen, prepaid meter, and clean running water."
+        "description": "Newly renovated residential home with fitted kitchen, prepaid meter, and clean running water.",
+        "shared_washroom": False,
+        "shared_electricity": False,
+        "shared_water": True,
+        "shared_compound": True,
+        "landlord_resides_on_compound": True
     },
     {
         "id": "ad_prop_3",
@@ -51,7 +62,12 @@ DEFAULT_PAID_ADVERTS = [
         "landlord_name": "RentMaster Properties Ltd",
         "contact_phone": "+233240000003",
         "whatsapp_link": "https://wa.me/233240000003?text=Inquiry%20regarding%20Commercial%20Office%20Space.",
-        "description": "High-visibility commercial building suitable for corporate headquarters, bank branch, or retail store."
+        "description": "High-visibility commercial building suitable for corporate headquarters, bank branch, or retail store.",
+        "shared_washroom": True,
+        "shared_electricity": False,
+        "shared_water": False,
+        "shared_compound": True,
+        "landlord_resides_on_compound": False
     }
 ]
 
@@ -124,6 +140,14 @@ def render_public_featured_properties():
                 if prop.get("description"):
                     st.write(prop["description"][:110] + "...")
 
+                # FACILITY & COMPOUND DISCLOSURES EXPANDER FOR PROSPECTIVE TENANTS
+                with st.expander("🏘️ Shared Facilities & Compound Disclosures", expanded=True):
+                    st.write(f"• **Washroom:** {'⚠️ Shared with occupants' if prop.get('shared_washroom') else '✅ Private / En-Suite'}")
+                    st.write(f"• **Electricity Meter:** {'⚠️ Shared Meter' if prop.get('shared_electricity') else '✅ Separate Private Meter'}")
+                    st.write(f"• **Water Supply:** {'⚠️ Shared Water Supply' if prop.get('shared_water') else '✅ Private Water Tank / Meter'}")
+                    st.write(f"• **Compound & Yard:** {'⚠️ Shared Compound' if prop.get('shared_compound', True) else '✅ Private Compound'}")
+                    st.write(f"• **Landlord Presence:** {'🏠 Landlord resides on same compound' if prop.get('landlord_resides_on_compound') else '🌿 Landlord resides off-site'}")
+
                 st.divider()
 
                 # Tenant Inquiry Action Buttons
@@ -158,6 +182,17 @@ def show_public_property_listing_dialog():
             p_phone = st.text_input("WhatsApp / Contact Phone *", placeholder="+233200000000")
 
         p_desc = st.text_area("Property Features & Description")
+        
+        st.markdown("---")
+        st.markdown("##### 🏘️ Disclose Shared Facilities to Tenants")
+        c_dis1, c_dis2 = st.columns(2)
+        with c_dis1:
+            p_washroom = st.checkbox("Shared Washroom/Toilet", value=False)
+            p_elec = st.checkbox("Shared Electricity Meter", value=False)
+        with c_dis2:
+            p_water = st.checkbox("Shared Water Supply", value=False)
+            p_landlord = st.checkbox("Landlord Resides on Same Compound", value=False)
+
         p_img = st.text_input("Property Photo URL", value="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800")
 
         st.info("💳 Listing Fee: **GH₵ 50 ($5 USD)** for 30 Days Global Showcase.")
@@ -179,6 +214,11 @@ def show_public_property_listing_dialog():
                     "contact_phone": p_phone,
                     "whatsapp_link": f"https://wa.me/{p_phone.replace('+', '')}?text=Inquiry%20regarding%20{p_title}",
                     "description": p_desc,
+                    "shared_washroom": p_washroom,
+                    "shared_electricity": p_elec,
+                    "shared_water": p_water,
+                    "shared_compound": True,
+                    "landlord_resides_on_compound": p_landlord,
                     "status": "paid"
                 }
 
