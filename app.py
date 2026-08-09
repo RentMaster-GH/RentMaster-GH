@@ -23,15 +23,16 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 3.5 INJECT GTM + GOOGLE ANALYTICS + SITE VERIFICATION INTO TOP-LEVEL <head>
+# 3.5 INJECT GTM + GA4 + SITE VERIFICATION (<head> & <body> NOSCRIPT)
 components.html(
     """
     <script>
     (function() {
         try {
             var head = window.parent.document.head;
+            var body = window.parent.document.body;
             
-            // 1. Inject Google Tag Manager (GTM-M8WLPHJW)
+            // 1. Inject Google Tag Manager (GTM-M8WLPHJW) into <head>
             if (!window.parent.document.getElementById('gtm-script')) {
                 var gtmInit = window.parent.document.createElement('script');
                 gtmInit.id = 'gtm-init';
@@ -48,7 +49,23 @@ components.html(
                 head.appendChild(gtmScript);
             }
 
-            // 2. Inject Google Analytics 4 (G-4SEHLP8VTN)
+            // 2. Inject GTM <noscript> iframe immediately after opening <body> tag
+            if (!window.parent.document.getElementById('gtm-noscript')) {
+                var noscript = window.parent.document.createElement('noscript');
+                noscript.id = 'gtm-noscript';
+                
+                var iframe = window.parent.document.createElement('iframe');
+                iframe.src = 'https://www.googletagmanager.com/ns.html?id=GTM-M8WLPHJW';
+                iframe.height = '0';
+                iframe.width = '0';
+                iframe.style.display = 'none';
+                iframe.style.visibility = 'hidden';
+                
+                noscript.appendChild(iframe);
+                body.insertBefore(noscript, body.firstChild);
+            }
+
+            // 3. Inject Google Analytics 4 (G-4SEHLP8VTN)
             if (!window.parent.document.getElementById('ga-gtag-js')) {
                 var gaScript = window.parent.document.createElement('script');
                 gaScript.id = 'ga-gtag-js';
@@ -67,7 +84,7 @@ components.html(
                 head.appendChild(gaInit);
             }
 
-            // 3. Inject Google Site Verification Meta Tag
+            // 4. Inject Google Site Verification Meta Tag
             if (!window.parent.document.querySelector('meta[name="google-site-verification"]')) {
                 var meta = window.parent.document.createElement('meta');
                 meta.name = 'google-site-verification';
@@ -75,7 +92,7 @@ components.html(
                 head.appendChild(meta);
             }
         } catch (e) {
-            console.error("Head Injection Error:", e);
+            console.error("Head/Body Injection Error:", e);
         }
     })();
     </script>
