@@ -200,7 +200,7 @@ def auth_page():
         """
         <div class="auth-hero-banner">
             <h1>🏠 RentMaster-GH Enterprise</h1>
-            <p>Smart Rental Property Management System &middot; Landlord & Tenant Portals &middot; Split Payouts &middot; Ghana Rent Cards</p>
+            <p>Smart Rental Property Management System &middot; Landlord & Tenant Portals &middot; Split Payouts</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -293,7 +293,7 @@ def auth_page():
                 new_password = st.text_input("Create Password", type="password", key="signup_pw")
                 confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pw")
 
-                # UPDATED ACCOUNT TYPE SELECTION BOX WITH 3 CLEAR ROLES
+                # ACCOUNT TYPE SELECTION BOX WITH 3 CLEAR ROLES
                 role_choice = st.radio(
                     "Account Type / Role *",
                     [
