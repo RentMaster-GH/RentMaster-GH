@@ -118,21 +118,15 @@ def page_dashboard():
     col7.metric("Overdue", fmt_money(overdue))
     col8.metric("Open Maintenance", sum(1 for m in maint if m.get("status") in ("open", "in_progress")))
 
-    # -------------------------------------------------------------------
     # PROPERTY EXPENSE & NET INCOME/LOSS FINANCIAL ENGINE
-    # -------------------------------------------------------------------
     st.markdown("---")
     render_financial_net_income_engine(user)
 
-    # -------------------------------------------------------------------
     # RENT OVERDUE ALERT ENGINE WIDGET
-    # -------------------------------------------------------------------
     st.markdown("---")
     render_overdue_alerts_widget(tenants, payments)
 
-    # -------------------------------------------------------------------
     # TENANT MAINTENANCE & REPAIR TICKETS REVIEW CENTER
-    # -------------------------------------------------------------------
     st.markdown("---")
     st.markdown("### 🛠️ Tenant Maintenance & Repair Requests")
     
@@ -203,55 +197,62 @@ def page_user_profile():
 
     with profile_tab1:
         st.markdown("#### 📄 Account Details")
-        with st.form("account_details_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.text_input("User ID", value=user_id, disabled=True)
-                full_name = st.text_input("Full Official Name *", value=st.session_state.get("profile_full_name", ""))
-                phone = st.text_input("Phone Number *", value=st.session_state.get("profile_phone", ""), placeholder="+233 20 000 0000")
-            with col2:
-                st.text_input("Email Address", value=user_email, disabled=True)
-                
-                # 1. ACCOUNT ROLE DROPDOWN (LOCKED TO TENANT IN TENANT VIEW)
-                if user_role == "tenant":
-                    role_options = ["Tenant"]
-                else:
-                    role_options = ["Landlord / Property Manager"]
+        
+        # DYNAMICALLY LINKED COUNTRY & CITY SELECTORS (LIVE RERUN OUTSIDE FORM)
+        c_col1, c_col2 = st.columns(2)
+        with c_col1:
+            full_name = st.text_input("Full Official Name *", value=st.session_state.get("profile_full_name", ""))
+            phone = st.text_input("Phone Number *", value=st.session_state.get("profile_phone", ""), placeholder="+233 20 000 0000")
+            
+            # Country Selectbox
+            selected_country = st.selectbox(
+                "Country of Residence *",
+                list(GLOBAL_COUNTRIES_AND_CITIES.keys()),
+                key="live_profile_country_select"
+            )
 
-                selected_role = st.selectbox("Account Role", options=role_options)
+        with c_col2:
+            st.text_input("Email Address", value=user_email, disabled=True)
+            
+            # Role Selection
+            role_options = ["Tenant"] if user_role == "tenant" else ["Landlord / Property Manager"]
+            selected_role = st.selectbox("Account Role", options=role_options)
 
-                # 3. COUNTRY & CITY SELECTOR DROPDOWNS
-                selected_country = st.selectbox("Country of Residence *", list(GLOBAL_COUNTRIES_AND_CITIES.keys()), key="profile_country_select")
-                available_cities = GLOBAL_COUNTRIES_AND_CITIES[selected_country]
-                selected_city = st.selectbox("City / Town *", available_cities, key="profile_city_select")
+            # City Selectbox dynamically populated from Country selection
+            available_cities = GLOBAL_COUNTRIES_AND_CITIES[selected_country]
+            selected_city = st.selectbox(
+                f"City / Town ({selected_country.split()[0]}) *",
+                available_cities,
+                key="live_profile_city_select"
+            )
 
-            if st.form_submit_button("Save Account Details", type="primary", use_container_width=True):
-                if not full_name or not phone:
-                    st.error("Please fill in your full name and phone number.")
-                else:
-                    st.session_state["profile_full_name"] = full_name
-                    st.session_state["profile_phone"] = phone
-                    st.session_state["profile_country"] = selected_country
-                    st.session_state["profile_city"] = selected_city
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("💾 Save Account Details", type="primary", use_container_width=True):
+            if not full_name or not phone:
+                st.error("Please fill in your full official name and phone number.")
+            else:
+                st.session_state["profile_full_name"] = full_name
+                st.session_state["profile_phone"] = phone
+                st.session_state["profile_country"] = selected_country
+                st.session_state["profile_city"] = selected_city
 
-                    # Update Supabase profile table if connected
-                    if sb:
-                        try:
-                            sb.table("profiles").upsert({
-                                "id": user_id,
-                                "email": user_email,
-                                "full_name": full_name,
-                                "phone": phone,
-                                "role": "tenant" if user_role == "tenant" else "landlord",
-                                "country": selected_country,
-                                "city": selected_city
-                            }).execute()
-                        except Exception:
-                            pass
+                if sb:
+                    try:
+                        sb.table("profiles").upsert({
+                            "id": user_id,
+                            "email": user_email,
+                            "full_name": full_name,
+                            "phone": phone,
+                            "role": "tenant" if user_role == "tenant" else "landlord",
+                            "country": selected_country,
+                            "city": selected_city
+                        }).execute()
+                    except Exception:
+                        pass
 
-                    st.toast("✅ Account details saved successfully!", icon="👤")
-                    st.success("✅ Profile updated!")
-                    st.rerun()
+                st.toast("✅ Account details saved successfully!", icon="👤")
+                st.success(f"✅ Profile updated! Residence set to **{selected_city}, {selected_country}**.")
+                st.rerun()
 
     with profile_tab2:
         st.markdown("#### 👥 User Management")
