@@ -22,6 +22,11 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+st.markdown(
+    '<meta name="google-site-verification" content="googlec00f3bc3597f0f8f.html" />',
+    unsafe_allow_html=True
+)
+
 # 4. Local application imports
 from services.helpers import (
     inject_google_analytics, inject_google_site_verification, get_user_role
