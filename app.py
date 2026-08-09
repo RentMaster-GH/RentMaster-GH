@@ -23,7 +23,7 @@ st.set_page_config(
 )
 
 st.markdown(
-    '<meta name="google-site-verification" content="googlec00f3bc3597f0f8f.html" />',
+    '<meta name="google-site-verification" content="googlec00f3bc3597f0f8f" />',
     unsafe_allow_html=True
 )
 
