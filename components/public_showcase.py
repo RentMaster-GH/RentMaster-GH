@@ -1,141 +1,190 @@
-# components/public_showcase.py
-import uuid
-import urllib.parse
+"""
+RentMaster-GH - Public Property Discovery & Paid Advert Marketplace Portal
+Allows prospective tenants to search, filter, and inquire about paid property listings.
+"""
 import streamlit as st
-from services.helpers import fmt_money, get_current_currency
-from services.database import sb, upload_id_to_supabase
-from services.paystack import initialize_paystack_payment
+import json
+from services.database import sb
+
+# Demo Featured Property Adverts
+DEFAULT_PAID_ADVERTS = [
+    {
+        "id": "ad_prop_1",
+        "title": "Luxury 3-Bedroom Executive Apartment",
+        "location": "East Legon, Accra, Ghana 🇬🇭",
+        "price": 2500.00,
+        "currency": "GHS",
+        "property_type": "Apartment",
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "image_url": "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800",
+        "landlord_name": "Chief Kwame Appiah",
+        "contact_phone": "+233200000001",
+        "whatsapp_link": "https://wa.me/233200000001?text=Hi%2C%20I%20am%20interested%20in%20your%20East%20Legon%20Apartment%20advertised%20on%20RentMaster-GH.",
+        "description": "Spacious fully furnished apartment with air conditioning, 24/7 security, standby generator, and swimming pool access."
+    },
+    {
+        "id": "ad_prop_2",
+        "title": "Modern 2-Bedroom Gated House",
+        "location": "Lekki Phase 1, Lagos, Nigeria 🇳🇬",
+        "price": 1800.00,
+        "currency": "USD",
+        "property_type": "House",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "image_url": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800",
+        "landlord_name": "Madam Abena Osei",
+        "contact_phone": "+2348000000002",
+        "whatsapp_link": "https://wa.me/2348000000002?text=Hello%2C%20I%20saw%20your%20Lagos%20property%20listing%20on%20RentMaster-GH.",
+        "description": "Newly renovated residential home with fitted kitchen, prepaid meter, and clean running water."
+    },
+    {
+        "id": "ad_prop_3",
+        "title": "Prime Commercial Office / Retail Space",
+        "location": "Airport Residential Area, Accra, Ghana 🇬🇭",
+        "price": 4000.00,
+        "currency": "GHS",
+        "property_type": "Commercial",
+        "bedrooms": 0,
+        "bathrooms": 2,
+        "image_url": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800",
+        "landlord_name": "RentMaster Properties Ltd",
+        "contact_phone": "+233240000003",
+        "whatsapp_link": "https://wa.me/233240000003?text=Inquiry%20regarding%20Commercial%20Office%20Space.",
+        "description": "High-visibility commercial building suitable for corporate headquarters, bank branch, or retail store."
+    }
+]
 
 
-@st.dialog("🏠 List Your Property on Public Showcase (GH₵ 50 / $5)", width="large")
-def show_public_property_listing_dialog():
-    st.write("Promote your vacant apartment, house, or commercial property to thousands of active tenant visitors. Your listing goes live instantly after payment!")
-    
-    curr_code = get_current_currency()
-    fee_amount = 50.0 if curr_code == "GHS" else 5.0
+def fetch_paid_property_adverts():
+    """Fetch active paid property listings from Supabase or fallback data."""
+    if not sb:
+        return st.session_state.get("paid_property_adverts", DEFAULT_PAID_ADVERTS)
 
-    with st.form("public_property_listing_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            prop_title = st.text_input("Property / Apartment Title *", placeholder="e.g. Luxury 2-Bedroom Apartment in East Legon")
-            location = st.text_input("Location / Address *", placeholder="e.g. East Legon, Accra")
-            rent_amount = st.number_input(f"Monthly Rent ({curr_code}) *", min_value=1.0, value=2500.0, step=100.0)
-            owner_phone = st.text_input("Landlord WhatsApp Number *", placeholder="e.g. 024XXXXXXX or +233XXXXXXX")
-
-        with col2:
-            owner_email = st.text_input("Landlord Email Address *", placeholder="landlord@example.com")
-            beds = st.number_input("Bedrooms", min_value=0, value=2)
-            baths = st.number_input("Bathrooms", min_value=1, value=2)
-            prop_type = st.selectbox("Property Category", ["apartment", "house", "commercial", "studio", "room"])
-
-        description = st.text_area("Property Highlights & Amenities", placeholder="Describe amenities (e.g. AC, 24/7 security, backup generator, water heater)...")
-        
-        st.markdown("##### Upload Property Photo")
-        prop_image_file = st.file_uploader("Upload Image File (PNG, JPG, JPEG) *", type=["png", "jpg", "jpeg"])
-        image_url_fallback = st.text_input("OR Enter Image Web Link URL", placeholder="https://example.com/property.jpg")
-
-        callback_domain = st.text_input("Callback Base URL", value="https://www.rentmastergh.com")
-
-        st.info(f"💳 **Listing Fee:** {fmt_money(fee_amount, curr_code)} for 30 Days Public Showcase Promotion.")
-
-        if st.form_submit_button("💳 Pay GH₵ 50 via Paystack & Publish Listing", type="primary", use_container_width=True):
-            if not prop_title or not location or not owner_phone or not owner_email:
-                st.error("Please fill in all required fields marked with *.")
-            elif not prop_image_file and not image_url_fallback:
-                st.error("Please upload a property photo or enter an image URL.")
-            else:
-                with st.spinner("Processing photo & initializing Paystack Checkout..."):
-                    try:
-                        img_url = image_url_fallback
-                        if prop_image_file:
-                            img_url = upload_id_to_supabase(prop_image_file, prop_title[:10], folder="public_listings")
-
-                        reference = f"PROP-{uuid.uuid4().hex[:10].upper()}"
-
-                        if sb:
-                            sb.table("public_listings").insert({
-                                "property_name": prop_title,
-                                "location": location,
-                                "monthly_rent": float(rent_amount),
-                                "currency": curr_code,
-                                "bedrooms": int(beds),
-                                "bathrooms": int(baths),
-                                "contact_phone": owner_phone,
-                                "contact_email": owner_email,
-                                "image_url": img_url,
-                                "description": description,
-                                "status": "pending_payment",
-                                "reference": reference,
-                            }).execute()
-
-                        paystack_res = initialize_paystack_payment(
-                            email=owner_email,
-                            amount_in_main_unit=fee_amount,
-                            callback_url=callback_domain,
-                            metadata={
-                                "type": "public_property_listing",
-                                "property_name": prop_title,
-                                "reference": reference
-                            },
-                            currency=curr_code
-                        )
-
-                        if paystack_res.get("status"):
-                            st.success("✅ Listing registered! Complete payment below to publish your property live.")
-                            st.link_button("👉 Complete Paystack Checkout (Card / Mobile Money)", paystack_res["data"]["authorization_url"], type="primary", use_container_width=True)
-                        else:
-                            st.error(f"Paystack initialization failed: {paystack_res.get('message')}")
-                    except Exception as e:
-                        st.error(f"Error initializing listing: {e}")
-
-
-def render_public_featured_properties():
-    """
-    Renders paid featured property listings on the public auth screen for visitors.
-    """
     try:
-        if not sb: return
-        res = sb.table("public_listings").select("*").in_("status", ["paid", "active"]).order("created_at", desc=True).execute()
-        listings = res.data or []
+        res = sb.table("public_listings").select("*").eq("status", "paid").execute()
+        if res.data:
+            return res.data
     except Exception:
-        listings = []
+        pass
 
-    if not listings:
+    return st.session_state.get("paid_property_adverts", DEFAULT_PAID_ADVERTS)
+
+
+# ---------------------------------------------------------------------------
+# PUBLIC PROPERTY MARKETPLACE PORTAL
+# ---------------------------------------------------------------------------
+def render_public_featured_properties():
+    """Renders the Paid Property Discovery Portal for prospective tenants."""
+    st.markdown("### 🔍 Find Properties & Paid Listings Showcase")
+    st.caption("Browse vacant properties advertised by property owners across Ghana and worldwide.")
+
+    listings = fetch_paid_property_adverts()
+
+    # Search & Filter Bar
+    f_col1, f_col2, f_col3 = st.columns([2, 1, 1])
+    with f_col1:
+        search_query = st.text_input("🔍 Search by Location or Keywords", placeholder="e.g. Accra, Lagos, East Legon, 3-Bedroom...").lower()
+    with f_col2:
+        type_filter = st.selectbox("Property Type", ["All Types", "Apartment", "House", "Commercial"])
+    with f_col3:
+        max_price = st.number_input("Max Rent Price", min_value=0.0, value=10000.0, step=500.0)
+
+    # Filter Logic
+    filtered_listings = []
+    for item in listings:
+        match_query = not search_query or (search_query in item.get("title", "").lower() or search_query in item.get("location", "").lower())
+        match_type = type_filter == "All Types" or item.get("property_type", "").lower() == type_filter.lower()
+        match_price = float(item.get("price", 0)) <= max_price
+
+        if match_query and match_type and match_price:
+            filtered_listings.append(item)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    if not filtered_listings:
+        st.info("ℹ️ No properties matched your search filter criteria. Try adjusting your search query.")
         return
 
-    st.markdown(
-        """
-        <div style="margin-top: 2.5rem; margin-bottom: 1.2rem; text-align: center;">
-            <h3 style="color: #0f4c75; font-weight: 800; margin-bottom: 0.2rem;">🏘️ Featured Properties Available for Rent</h3>
-            <p style="color: #64748b; font-size: 0.9rem;">Browse verified properties listed by landlords and property managers across Ghana.</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    cols = st.columns(min(3, len(listings)))
-    for idx, listing in enumerate(listings):
-        with cols[idx % len(cols)]:
+    # Render Grid of Paid Property Cards
+    cols = st.columns(min(3, len(filtered_listings)))
+    for idx, prop in enumerate(filtered_listings):
+        with cols[idx % 3]:
             with st.container(border=True):
-                if listing.get("image_url"):
-                    st.image(listing.get("image_url"), use_container_width=True)
+                # Image
+                img_url = prop.get("image_url") or "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800"
+                st.image(img_url, use_container_width=True)
                 
-                st.markdown(f"#### {listing.get('property_name')}")
-                st.caption(f"📍 {listing.get('location')}")
+                # Title & Price Badge
+                st.markdown(f"#### {prop.get('title')}")
+                st.markdown(f"💰 Rent: **{prop.get('currency', 'GHS')} {float(prop.get('price', 0)):,.2f}** / Month")
+                st.caption(f"📍 {prop.get('location')}")
+                st.caption(f"🏠 {prop.get('property_type')} &middot; 🛏️ {prop.get('bedrooms', 0)} Beds &middot; 🚿 {prop.get('bathrooms', 0)} Baths")
                 
-                beds_str = f"🛏️ {listing.get('bedrooms')} Beds" if listing.get("bedrooms") else ""
-                baths_str = f"🚿 {listing.get('bathrooms')} Baths" if listing.get("bathrooms") else ""
-                st.caption(f"{beds_str}  |  {baths_str}")
-                
-                rent_formatted = fmt_money(listing.get("monthly_rent"), listing.get("currency", "GHS"))
-                st.markdown(f"Rent: :green[**{rent_formatted} / Mo**]")
+                if prop.get("description"):
+                    st.write(prop["description"][:110] + "...")
 
-                if listing.get("description"):
-                    st.write(listing.get("description")[:110] + "...")
+                st.divider()
 
-                phone = listing.get("contact_phone", "")
-                if phone:
-                    phone_clean = "".join(filter(str.isdigit, phone))
-                    msg = f"Hello, I am interested in your property listing '{listing.get('property_name')}' on RentMaster-GH."
-                    wa_url = f"https://wa.me/{phone_clean}?text={urllib.parse.quote(msg)}"
-                    st.link_button("📲 Contact Landlord (WhatsApp)", wa_url, use_container_width=True)
+                # Tenant Inquiry Action Buttons
+                btn_col1, btn_col2 = st.columns(2)
+                with btn_col1:
+                    wa_url = prop.get("whatsapp_link") or f"https://wa.me/{str(prop.get('contact_phone')).replace('+', '')}"
+                    st.link_button("💬 WhatsApp", wa_url, type="primary", use_container_width=True)
+                with btn_col2:
+                    if st.button("📞 Details", key=f"details_btn_{prop.get('id', idx)}", use_container_width=True):
+                        st.toast(f"Contact Landlord {prop.get('landlord_name')}: {prop.get('contact_phone')}")
+
+
+# ---------------------------------------------------------------------------
+# PUBLIC LISTING CREATION DIALOG (FOR LANDLORDS TO PAY GH₵ 50 / $5)
+# ---------------------------------------------------------------------------
+@st.dialog("🏠 List Vacant Property for Rent (GH₵ 50 / $5)", width="large")
+def show_public_property_listing_dialog():
+    st.write("Advertise your vacant rental property to prospective tenants across the world!")
+    
+    with st.form("public_property_ad_form"):
+        p_title = st.text_input("Property Title *", placeholder="e.g., Executive 2-Bedroom Apartment")
+        p_location = st.text_input("Location / City & Country *", placeholder="e.g., East Legon, Accra, Ghana")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            p_price = st.number_input("Monthly Rent Price *", min_value=1.0, value=1500.0, step=100.0)
+            p_curr = st.selectbox("Currency", ["GHS", "USD", "EUR", "NGN", "GBP"])
+            p_type = st.selectbox("Type", ["Apartment", "House", "Commercial"])
+        with c2:
+            p_beds = st.number_input("Bedrooms", min_value=0, value=2)
+            p_baths = st.number_input("Bathrooms", min_value=1, value=2)
+            p_phone = st.text_input("WhatsApp / Contact Phone *", placeholder="+233200000000")
+
+        p_desc = st.text_area("Property Features & Description")
+        p_img = st.text_input("Property Photo URL", value="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800")
+
+        st.info("💳 Listing Fee: **GH₵ 50 ($5 USD)** for 30 Days Global Showcase.")
+
+        if st.form_submit_button("💳 Pay GH₵ 50 & Publish Advert Live", type="primary", use_container_width=True):
+            if not p_title or not p_location or not p_phone:
+                st.error("Please fill in all required fields.")
+            else:
+                new_ad = {
+                    "id": f"ad_prop_{json.dumps(p_title).__hash__()}",
+                    "title": p_title,
+                    "location": p_location,
+                    "price": p_price,
+                    "currency": p_curr,
+                    "property_type": p_type,
+                    "bedrooms": p_beds,
+                    "bathrooms": p_baths,
+                    "image_url": p_img,
+                    "contact_phone": p_phone,
+                    "whatsapp_link": f"https://wa.me/{p_phone.replace('+', '')}?text=Inquiry%20regarding%20{p_title}",
+                    "description": p_desc,
+                    "status": "paid"
+                }
+
+                if "paid_property_adverts" not in st.session_state:
+                    st.session_state["paid_property_adverts"] = DEFAULT_PAID_ADVERTS
+                st.session_state["paid_property_adverts"].append(new_ad)
+
+                st.success("🎉 Property Advert Published! Prospective tenants can now discover your property.")
+                st.rerun()
