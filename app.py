@@ -22,11 +22,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown(
-    '<meta name="google-site-verification" content="googlec00f3bc3597f0f8f" />',
-    unsafe_allow_html=True
-)
-
 # 4. Local application imports
 from services.helpers import (
     inject_google_analytics, inject_google_site_verification, get_user_role
@@ -49,9 +44,10 @@ from ui.pages_management import (
 from ui.tenant_portal import render_tenant_portal
 from ui.sponsor_portal import render_sponsor_portal, show_sponsor_support_dialog
 
-# 5. Inject Google Analytics & Site Verification
+# 5. Inject Google Analytics & Site Verification Into Document <head>
 inject_google_analytics("G-EFD2P6FKM5")
 inject_google_site_verification("SXu9dztavBBjKgrko60Tx2CjufX2KvyRhW42SOczZrc")
+inject_google_site_verification("googlec00f3bc3597f0f8f")
 
 # Cookie Manager Instance
 try:
@@ -197,6 +193,17 @@ def auth_page():
                 font-weight: 500;
             }
         </style>
+        <script>
+            // Browser autofill optimization helper script
+            setTimeout(function() {
+                try {
+                    const inputs = window.parent.document.querySelectorAll('input[type="text"]');
+                    inputs.forEach(i => i.setAttribute('autocomplete', 'username'));
+                    const pwInputs = window.parent.document.querySelectorAll('input[type="password"]');
+                    pwInputs.forEach(i => i.setAttribute('autocomplete', 'current-password'));
+                } catch(e){}
+            }, 800);
+        </script>
         """,
         unsafe_allow_html=True
     )
