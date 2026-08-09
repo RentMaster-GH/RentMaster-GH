@@ -10,63 +10,97 @@ from components.payment_system import render_comprehensive_rent_payment_widget
 from components.tenancy_lifecycle import render_tenant_lease_lifecycle_widget
 from components.property_location_rentcard import render_tenant_gps_and_rentcard_widget
 from components.deposit_refund import render_tenant_deposit_refund_widget
+from components.public_showcase import render_public_featured_properties
 from ui.pages_core import header
 
 
 def render_tenant_portal():
     header()
-    st.subheader("🏠 Tenant Self-Service Portal")
 
     user_id, user_email = get_active_user_info()
     user = st.session_state.get("user")
     tenant = fetch_tenant_profile_by_email(user_email)
 
-    # 1. 90-DAY RENEWAL / TERMINATION REQUEST & 3-MONTH GRACE PERIOD TRACKER
-    if tenant and tenant.get("leases"):
-        lease_data = tenant["leases"][0] if isinstance(tenant["leases"], list) else tenant["leases"]
-        render_tenant_lease_lifecycle_widget(user, lease_data)
-        st.divider()
-    elif tenant:
-        # Construct fallback lease details from tenant record
-        fallback_lease = {
-            "id": f"lease_{tenant.get('id', '101')}",
-            "end_date": str(tenant.get("lease_end") or (datetime.now() + timedelta(days=60)).strftime("%Y-%m-%d")),
-            "tenant_intent": tenant.get("tenant_intent"),
-            "landlord_intent_decision": tenant.get("landlord_intent_decision"),
-            "tenant_intent_requested_at": tenant.get("tenant_intent_requested_at")
-        }
-        render_tenant_lease_lifecycle_widget(user, fallback_lease)
-        st.divider()
-
-    # UNIFIED PORTAL TABS (Always visible)
-    tab_pay, tab_docs, tab_maint, tab_chat, tab_kyc = st.tabs([
-        "💳 Rent & Installment Payment Portal",
-        "📋 Official Rent Documents & Rent Card",
-        "🛠️ Repair & Maintenance Requests",
-        "💬 Chat & Video Call Landlord",
-        "🆔 Verification & Mutual Agreement"
-    ])
+    # DETECT IF USER IS PROSPECTIVE OR ACTIVE TENANT
+    is_prospective = not tenant or tenant.get("is_active") is False
 
     # -----------------------------------------------------------------------
-    # TAB 1: COMPREHENSIVE RENT & INSTALLMENT PAYMENT PORTAL (ALWAYS VISIBLE)
+    # VIEW A: PROSPECTIVE TENANT PORTAL (LOOKING FOR PROPERTY TO RENT)
     # -----------------------------------------------------------------------
-    with tab_pay:
-        # RENT & INSTALLMENT PAYMENT WIDGET
-        render_comprehensive_rent_payment_widget(user)
-
-        st.markdown("---")
-        # SECURITY DEPOSIT REFUND CLAIM PORTAL
-        lease_obj = (tenant["leases"][0] if isinstance(tenant["leases"], list) else tenant["leases"]) if (tenant and tenant.get("leases")) else {
-            "id": "lease_demo_101",
-            "tenant_id": tenant.get("id") if tenant else "demo_tenant",
-            "deposit_amount": tenant.get("deposit_amount", 1000.00) if tenant else 1000.00
-        }
-        render_tenant_deposit_refund_widget(user, lease_obj)
-
-        st.markdown("---")
-        st.markdown("#### 📋 Itemized Rent Ledger & PDF Receipts")
+    if is_prospective:
+        st.subheader("🔍 Prospective Tenant Portal — Find & Apply for Properties")
+        st.info("💡 Browse vacant property adverts, complete your pre-application KYC verification, or contact property owners directly.")
         
-        if tenant:
+        tab_search, tab_kyc, tab_chat = st.tabs([
+            "🔍 Browse Vacant Properties & Adverts",
+            "🆔 Pre-Application KYC Verification",
+            "📞 Chat & Video Call Landlords"
+        ])
+
+        with tab_search:
+            render_public_featured_properties()
+
+        with tab_kyc:
+            render_id_verification_widget(user, role="tenant")
+
+        with tab_chat:
+            render_chat_interface(
+                tenant_id="demo_prospective",
+                current_user_id=user_id,
+                current_user_role="tenant",
+                current_user_email=user_email,
+                recipient_name="Property Landlord / Agent"
+            )
+
+    # -----------------------------------------------------------------------
+    # VIEW B: ACTIVE TENANT SELF-SERVICE PORTAL (ALREADY RENTING)
+    # -----------------------------------------------------------------------
+    else:
+        st.subheader("🏠 Active Tenant Self-Service Portal")
+
+        # 1. 90-DAY RENEWAL / TERMINATION REQUEST & 3-MONTH GRACE PERIOD TRACKER
+        if tenant and tenant.get("leases"):
+            lease_data = tenant["leases"][0] if isinstance(tenant["leases"], list) else tenant["leases"]
+            render_tenant_lease_lifecycle_widget(user, lease_data)
+            st.divider()
+        elif tenant:
+            fallback_lease = {
+                "id": f"lease_{tenant.get('id', '101')}",
+                "end_date": str(tenant.get("lease_end") or (datetime.now() + timedelta(days=60)).strftime("%Y-%m-%d")),
+                "tenant_intent": tenant.get("tenant_intent"),
+                "landlord_intent_decision": tenant.get("landlord_intent_decision"),
+                "tenant_intent_requested_at": tenant.get("tenant_intent_requested_at")
+            }
+            render_tenant_lease_lifecycle_widget(user, fallback_lease)
+            st.divider()
+
+        # UNIFIED ACTIVE PORTAL TABS
+        tab_pay, tab_docs, tab_maint, tab_chat, tab_kyc = st.tabs([
+            "💳 Rent & Installment Payment Portal",
+            "📋 Official Rent Documents & Rent Card",
+            "🛠️ Repair & Maintenance Requests",
+            "💬 Chat & Video Call Landlord",
+            "🆔 Verification & Mutual Agreement"
+        ])
+
+        # -----------------------------------------------------------------------
+        # TAB 1: RENT & INSTALLMENT PAYMENT PORTAL
+        # -----------------------------------------------------------------------
+        with tab_pay:
+            render_comprehensive_rent_payment_widget(user)
+
+            st.markdown("---")
+            # SECURITY DEPOSIT REFUND CLAIM PORTAL
+            lease_obj = (tenant["leases"][0] if isinstance(tenant["leases"], list) else tenant["leases"]) if (tenant and tenant.get("leases")) else {
+                "id": "lease_demo_101",
+                "tenant_id": tenant.get("id") if tenant else "demo_tenant",
+                "deposit_amount": tenant.get("deposit_amount", 1000.00) if tenant else 1000.00
+            }
+            render_tenant_deposit_refund_widget(user, lease_obj)
+
+            st.markdown("---")
+            st.markdown("#### 📋 Itemized Rent Ledger & PDF Receipts")
+            
             all_payments = fetch_payments(user_id, user_email)
             ledger = compute_tenant_ledger(tenant, all_payments)
             curr_code = st.session_state.get("app_currency", "GHS")
@@ -96,65 +130,63 @@ def render_tenant_portal():
                                 st.caption("PDF N/A")
             else:
                 st.info("No completed payments logged under this account yet.")
-        else:
-            st.info("ℹ️ Once your landlord links your email address (`" + str(user_email) + "`) to your property lease, your official ledger history will automatically appear here.")
 
-    # -----------------------------------------------------------------------
-    # TAB 2: DOCUMENTS, GHANA RENT CARD & GPS DIRECTIONS
-    # -----------------------------------------------------------------------
-    with tab_docs:
-        prop_id = (tenant.get("properties") or {}).get("id", "demo_prop_1") if tenant and isinstance(tenant.get("properties"), dict) else "demo_prop_1"
-        render_tenant_gps_and_rentcard_widget(user, property_id=prop_id)
+        # -----------------------------------------------------------------------
+        # TAB 2: DOCUMENTS, GHANA RENT CARD & GPS DIRECTIONS
+        # -----------------------------------------------------------------------
+        with tab_docs:
+            prop_id = (tenant.get("properties") or {}).get("id", "demo_prop_1") if tenant and isinstance(tenant.get("properties"), dict) else "demo_prop_1"
+            render_tenant_gps_and_rentcard_widget(user, property_id=prop_id)
 
-    # -----------------------------------------------------------------------
-    # TAB 3: MAINTENANCE REQUESTS
-    # -----------------------------------------------------------------------
-    with tab_maint:
-        st.markdown("#### 🛠️ Request Repairs or Maintenance")
-        with st.form("tenant_maint_form", clear_on_submit=True):
-            m_title = st.text_input("Issue Title *", placeholder="e.g. Leaking bathroom pipe")
-            m_priority = st.selectbox("Urgency Level", ["low", "medium", "high", "urgent"])
-            m_desc = st.text_area("Detailed Description *", placeholder="Describe the maintenance issue...")
+        # -----------------------------------------------------------------------
+        # TAB 3: MAINTENANCE REQUESTS
+        # -----------------------------------------------------------------------
+        with tab_maint:
+            st.markdown("#### 🛠️ Request Repairs or Maintenance")
+            with st.form("tenant_maint_form", clear_on_submit=True):
+                m_title = st.text_input("Issue Title *", placeholder="e.g. Leaking bathroom pipe")
+                m_priority = st.selectbox("Urgency Level", ["low", "medium", "high", "urgent"])
+                m_desc = st.text_area("Detailed Description *", placeholder="Describe the maintenance issue...")
 
-            if st.form_submit_button("Submit Maintenance Request", type="primary"):
-                if not m_title or not m_desc:
-                    st.error("Please fill in title and description.")
-                elif sb:
-                    try:
-                        prop_obj = (tenant.get("properties") or {}) if tenant else {}
-                        sb.table("maintenance_requests").insert({
-                            "property_id": prop_obj.get("id"),
-                            "tenant_id": tenant.get("id") if tenant else None,
-                            "title": m_title,
-                            "description": m_desc,
-                            "priority": m_priority,
-                            "status": "open",
-                            "user_id": user_id,
-                            "user_email": user_email
-                        }).execute()
-                        clear_cache()
-                        st.success("✅ Maintenance request submitted to landlord!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Failed to submit request: {e}")
+                if st.form_submit_button("Submit Maintenance Request", type="primary"):
+                    if not m_title or not m_desc:
+                        st.error("Please fill in title and description.")
+                    elif sb:
+                        try:
+                            prop_obj = (tenant.get("properties") or {}) if tenant else {}
+                            sb.table("maintenance_requests").insert({
+                                "property_id": prop_obj.get("id"),
+                                "tenant_id": tenant.get("id") if tenant else None,
+                                "title": m_title,
+                                "description": m_desc,
+                                "priority": m_priority,
+                                "status": "open",
+                                "user_id": user_id,
+                                "user_email": user_email
+                            }).execute()
+                            clear_cache()
+                            st.success("✅ Maintenance request submitted to landlord!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to submit request: {e}")
 
-    # -----------------------------------------------------------------------
-    # TAB 4: CHAT & VIDEO CALL LANDLORD
-    # -----------------------------------------------------------------------
-    with tab_chat:
-        landlord_obj = (tenant.get("properties") or {}).get("landlords") if tenant and isinstance(tenant.get("properties"), dict) else {}
-        landlord_name = landlord_obj.get("name", "Landlord") if isinstance(landlord_obj, dict) else "Landlord"
-        
-        render_chat_interface(
-            tenant_id=tenant.get("id") if tenant else "demo_tenant",
-            current_user_id=user_id,
-            current_user_role="tenant",
-            current_user_email=user_email,
-            recipient_name=landlord_name
-        )
+        # -----------------------------------------------------------------------
+        # TAB 4: CHAT & VIDEO CALL LANDLORD
+        # -----------------------------------------------------------------------
+        with tab_chat:
+            landlord_obj = (tenant.get("properties") or {}).get("landlords") if tenant and isinstance(tenant.get("properties"), dict) else {}
+            landlord_name = landlord_obj.get("name", "Landlord") if isinstance(landlord_obj, dict) else "Landlord"
+            
+            render_chat_interface(
+                tenant_id=tenant.get("id") if tenant else "demo_tenant",
+                current_user_id=user_id,
+                current_user_role="tenant",
+                current_user_email=user_email,
+                recipient_name=landlord_name
+            )
 
-    # -----------------------------------------------------------------------
-    # TAB 5: TENANT VERIFICATION PORTAL & MUTUAL LANDLORD ACCEPTANCE
-    # -----------------------------------------------------------------------
-    with tab_kyc:
-        render_id_verification_widget(user, role="tenant")
+        # -----------------------------------------------------------------------
+        # TAB 5: TENANT VERIFICATION PORTAL & MUTUAL LANDLORD ACCEPTANCE
+        # -----------------------------------------------------------------------
+        with tab_kyc:
+            render_id_verification_widget(user, role="tenant")
