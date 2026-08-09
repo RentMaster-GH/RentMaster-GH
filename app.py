@@ -22,10 +22,23 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# 3.5 INJECT GOOGLE ANALYTICS + SITE VERIFICATION INTO <head>
+# This must come right after set_page_config so Google can see it
+st.markdown("""
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-EFD2P6FKM5"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-EFD2P6FKM5');
+</script>
+<!-- Google Site Verification -->
+<meta name="google-site-verification" content="vFWqfkLEFQARiYcF9r1M5FKhC6aQZD7P_LUli5fVN_M" />
+""", unsafe_allow_html=True)
+
 # 4. Local application imports
-from services.helpers import (
-    inject_google_analytics, inject_google_site_verification, get_user_role
-)
+from services.helpers import get_user_role
 from services.database import sb, clear_cache
 from services.paystack import handle_paystack_callbacks
 from components.ads import render_public_ad_banners
@@ -44,34 +57,26 @@ from ui.pages_management import (
 from ui.tenant_portal import render_tenant_portal
 from ui.sponsor_portal import render_sponsor_portal, show_sponsor_support_dialog
 
-# 5. Inject Google Analytics & Site Verification Into Document <head>
-inject_google_analytics("G-EFD2P6FKM5")
-inject_google_site_verification("vFWqfkLEFQARiYcF9r1M5FKhC6aQZD7P_LUli5fVN_M")
-
 # Cookie Manager Instance
 try:
     cookie_manager = stx.CookieManager(key="rentmaster_cookie_mgr")
 except Exception:
     cookie_manager = None
 
-
 def safe_get_cookie(cookie_name):
     if not cookie_manager: return None
     try: return cookie_manager.get(cookie=cookie_name)
     except Exception: return None
-
 
 def safe_set_cookie(cookie_name, value, expires_at):
     if not cookie_manager: return
     try: cookie_manager.set(cookie_name, value, expires_at=expires_at)
     except Exception: pass
 
-
 def safe_delete_cookie(cookie_name):
     if not cookie_manager: return
     try: cookie_manager.delete(cookie_name)
     except Exception: pass
-
 
 # Initialize Session State Defaults
 if "user" not in st.session_state:
@@ -112,11 +117,9 @@ if sb and "code" in st.query_params:
     except Exception:
         pass
 
-
 @st.dialog("📢 Self-Service Sponsor & Advertiser Hub", width="large")
 def show_public_sponsor_launch_dialog():
     render_sponsor_portal()
-
 
 # ---------------------------------------------------------------------------
 # Role-Aware Authentication Screen
@@ -158,7 +161,6 @@ def auth_page():
                 text-decoration: none;
                 font-size: 0.9rem;
             }
-            /* GREEN LOGIN & ADVERT BUTTON STYLING */
             div[data-testid="stButton"] button:has(p:contains("Launch Advert")),
             div[data-testid="stFormSubmitButton"] button:has(p:contains("Log In to Account")),
             div[data-testid="stButton"] button:has(p:contains("Log In to Account")) {
@@ -193,7 +195,6 @@ def auth_page():
             }
         </style>
         <script>
-            // Browser autofill optimization helper script
             setTimeout(function() {
                 try {
                     const inputs = window.parent.document.querySelectorAll('input[type="text"]');
@@ -239,7 +240,6 @@ def auth_page():
             redirect_url = "https://www.rentmastergh.com"
 
             with tab1:
-                # WRAPPED IN st.form TO HARVEST BROWSER AUTOFILL CORRECTLY
                 with st.form("login_credentials_form", clear_on_submit=False):
                     email = st.text_input("Email Address", key="login_email", placeholder="user@example.com")
                     password = st.text_input("Password", type="password", key="login_pw")
@@ -304,7 +304,6 @@ def auth_page():
                 new_password = st.text_input("Create Password", type="password", key="signup_pw")
                 confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pw")
 
-                # ACCOUNT TYPE SELECTION BOX WITH 3 ROLES
                 role_choice = st.radio(
                     "Account Type / Role *",
                     [
@@ -392,12 +391,10 @@ def auth_page():
         unsafe_allow_html=True
     )
 
-
 # Stop unauthenticated users from accessing app dashboard
 if st.session_state.get("user") is None:
     auth_page()
     st.stop()
-
 
 # ---------------------------------------------------------------------------
 # STRICT ROLE-BASED NAVIGATION ROUTER WITH VIEW MODE SWITCHER
@@ -442,7 +439,7 @@ with st.sidebar:
     selection = st.radio("Go to", nav_keys, index=default_index)
     st.session_state["current_page"] = selection
 
-    # 3-WAY VIEW MODE SWITCHER (LANDLORD, ACTIVE TENANT, PROSPECTIVE TENANT)
+    # 3-WAY VIEW MODE SWITCHER
     st.markdown("---")
     st.caption("🔄 Switch Active View Mode")
 
