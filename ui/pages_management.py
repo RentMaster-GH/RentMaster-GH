@@ -112,9 +112,9 @@ def page_properties():
 
             # Disclosures view
             with st.expander("🏘️ Facility Disclosures & Occupancy Rules", expanded=False):
-                st.write(f"• **Washroom:** {'Shared' if p.get('shared_washroom') else 'Private'}")
-                st.write(f"• **Electricity Meter:** {'Shared' if p.get('shared_electricity') else 'Private'}")
-                st.write(f"• **Water Supply:** {'Shared' if p.get('shared_water') else 'Private'}")
+                st.write(f"• **Washroom:** {'Shared with other occupants' if p.get('shared_washroom') else 'Private / En-Suite'}")
+                st.write(f"• **Electricity Meter:** {'Shared Meter' if p.get('shared_electricity') else 'Separate Private Meter'}")
+                st.write(f"• **Water Supply:** {'Shared Water Supply' if p.get('shared_water') else 'Private Water Tank / Meter'}")
                 st.write(f"• **Landlord Residence:** {'Resides on same compound' if p.get('landlord_resides_on_compound') else 'Resides off-site'}")
 
             # Pre-Move-In Property Condition & Photos Management Portal
