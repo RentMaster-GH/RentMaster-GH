@@ -26,7 +26,7 @@ st.set_page_config(
 # This must come right after set_page_config so Google can see it
 st.markdown("""
 <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-EFD2P6FKM5"></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-4SEHLP8VTN"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
