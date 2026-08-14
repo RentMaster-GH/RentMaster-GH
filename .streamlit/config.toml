@@ -13,3 +13,10 @@ gatherUsageStats = false
 
 [logger]
 level = "info"
+
+[theme]
+primaryColor = "#f59e0b"              # Amber Gold (Primary buttons, links, active elements)
+backgroundColor = "#111827"           # Dark Slate (Matches the dark left-hand panel)
+secondaryBackgroundColor = "#1f2937"  # Dark Gray (For cards, inputs, and sidebars)
+textColor = "#ffffff"                 # White text for dark background
+font = "sans serif"
