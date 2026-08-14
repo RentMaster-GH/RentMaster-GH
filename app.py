@@ -224,13 +224,14 @@ def auth_page():
         """
         <style>
             .auth-hero-banner {
-                background: linear-gradient(135deg, #0f4c75 0%, #1b262c 50%, #3282b8 100%);
+                background: linear-gradient(135deg, #111827 0%, #1f2937 50%, #111827 100%);
                 padding: 2.2rem 2rem;
                 border-radius: 16px;
                 text-align: center;
                 color: white;
                 margin-bottom: 2rem;
-                box-shadow: 0 12px 30px rgba(15, 76, 117, 0.18);
+                box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+                border-bottom: 3px solid #f59e0b;
             }
             .auth-hero-banner h1 {
                 color: #ffffff !important;
@@ -238,36 +239,48 @@ def auth_page():
                 font-weight: 800 !important;
                 margin-bottom: 0.4rem !important;
             }
+            .auth-hero-banner p {
+                color: #d1d5db !important;
+            }
             .paystack-quick-banner {
-                background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-                border: 1px solid #a7f3d0;
+                background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+                border: 1px solid #fecdd3;
                 border-radius: 12px;
                 padding: 1.1rem;
                 text-align: center;
                 margin-bottom: 1.2rem;
+                color: #9f1239;
             }
             .paystack-quick-btn {
                 display: inline-block;
-                background-color: #059669;
+                background-color: #e11d48;
                 color: white !important;
                 font-weight: 700;
                 padding: 10px 22px;
                 border-radius: 8px;
                 text-decoration: none;
                 font-size: 0.9rem;
+                transition: all 0.2s ease;
             }
-            /* GREEN LOGIN BUTTON & ACCENT STYLING */
+            .paystack-quick-btn:hover {
+                background-color: #be123c !important;
+            }
+            /* AMBER GOLD LOGIN BUTTON & ACCENT STYLING */
             div[data-testid="stFormSubmitButton"] button {
-                background-color: #16a34a !important;
-                border-color: #16a34a !important;
+                background-color: #f59e0b !important;
+                border-color: #f59e0b !important;
                 color: #ffffff !important;
-                font-weight: 700 !important;
+                font-weight: 800 !important;
+            }
+            div[data-testid="stFormSubmitButton"] button:hover {
+                background-color: #d97706 !important;
+                border-color: #d97706 !important;
             }
             .feature-pill {
                 display: inline-block;
-                background-color: #f1f5f9;
-                border: 1px solid #e2e8f0;
-                color: #334155;
+                background-color: #fffbeb;
+                border: 1px solid #fef3c7;
+                color: #b45309;
                 font-size: 0.8rem;
                 font-weight: 600;
                 padding: 6px 12px;
@@ -282,8 +295,8 @@ def auth_page():
                 gap: 1.8rem;
                 margin-top: 2rem;
                 padding-top: 1.2rem;
-                border-top: 1px solid #e2e8f0;
-                color: #64748b;
+                border-top: 1px solid #374151;
+                color: #9ca3af;
                 font-size: 0.85rem;
                 font-weight: 500;
             }
@@ -327,16 +340,16 @@ def auth_page():
             st.markdown(
                 """
                 <div class="paystack-quick-banner">
-                    <p>💡 Tenant or Sponsor making a payment without logging in?</p>
+                    <p style="margin-bottom: 0.6rem; font-weight: 600;">💡 Tenant or Sponsor making a payment without logging in?</p>
                     <a href="https://paystack.shop/pay/zvx0npq7hv" target="_blank" rel="noopener noreferrer" class="paystack-quick-btn">
-                        💙 Quick Pay / Support via Paystack
+                        💖 Quick Pay / Support via Paystack
                     </a>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-            st.markdown("<h3 style='text-align: center; margin-bottom: 1rem; color: #0f4c75;'>Account Access</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center; margin-bottom: 1rem; color: #f59e0b;'>Account Access</h3>", unsafe_allow_html=True)
 
             tab1, tab2 = st.tabs(["🔒 Log In", "📝 Sign Up"])
             redirect_url = "https://www.rentmastergh.com"
