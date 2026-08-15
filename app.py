@@ -1,6 +1,6 @@
 """
 RentMaster-GH - Rental Property Management Web App
-Main Entry Point & App Router with Strict Role-Based Navigation Filtering
+Main Entry Point & App Router with Automatic Role-Based Portal Filtering
 """
 import os
 import sys
@@ -178,6 +178,41 @@ if "user" not in st.session_state:
 if "app_currency" not in st.session_state:
     st.session_state["app_currency"] = "GHS"
 
+
+def resolve_user_active_role(user):
+    """
+    Precision Role Resolver: Automatically detects whether the logged in user is:
+    1. prospective_tenant
+    2. tenant (active)
+    3. landlord / property_manager
+    """
+    if not user:
+        return "prospective_tenant"
+    
+    # 1. Manual user override via view switcher
+    if st.session_state.get("user_role_override"):
+        return st.session_state["user_role_override"]
+
+    # 2. Inspect metadata attached to Supabase Auth user
+    meta = getattr(user, "user_metadata", {}) or {}
+    role = meta.get("role") or get_user_role(user)
+    subtype = meta.get("account_subtype")
+
+    if role == "landlord" or role == "property_manager":
+        return "landlord"
+    elif role == "tenant":
+        if subtype == "prospective":
+            return "prospective_tenant"
+        return "tenant"
+
+    # 3. Fallback database lookup
+    db_role = get_user_role(user)
+    if db_role in ["prospective_tenant", "tenant", "landlord"]:
+        return db_role
+
+    return "landlord"
+
+
 # Persistent Cookie Auto-Login
 if st.session_state.get("user") is None and sb:
     saved_session_cookie = safe_get_cookie("rentmaster_session")
@@ -205,6 +240,8 @@ if sb and "code" in st.query_params:
         res = sb.auth.exchange_code_for_session({"auth_code": auth_code})
         if res and res.user:
             st.session_state["user"] = res.user
+            st.session_state.pop("user_role_override", None)
+            st.session_state.pop("current_page", None)
             clear_cache()
             st.rerun()
     except Exception:
@@ -376,8 +413,9 @@ def auth_page():
                                 if res.user:
                                     st.session_state["user"] = res.user
                                     st.session_state["remember_me"] = remember_me
-                                    st.session_state.pop("current_page", None)
+                                    # Reset override to ensure automatic role detection
                                     st.session_state.pop("user_role_override", None)
+                                    st.session_state.pop("current_page", None)
 
                                     if res.session and remember_me:
                                         expires_at = datetime.now() + timedelta(days=30)
@@ -429,7 +467,17 @@ def auth_page():
                     horizontal=False,
                     key="signup_role_choice"
                 )
-                selected_role = "landlord" if "Landlord" in role_choice else "tenant"
+                
+                # Precise role extraction
+                if "Landlord" in role_choice:
+                    selected_role = "landlord"
+                    account_subtype = "manager"
+                elif "Prospective" in role_choice:
+                    selected_role = "tenant"
+                    account_subtype = "prospective"
+                else:
+                    selected_role = "tenant"
+                    account_subtype = "active"
 
                 if st.button("Create Account", use_container_width=True, key="signup_btn", type="primary"):
                     if new_email != confirm_email:
@@ -442,13 +490,13 @@ def auth_page():
                         st.error("Database connection missing.")
                     else:
                         try:
-                            sb.auth.sign_up({
+                            res = sb.auth.sign_up({
                                 "email": new_email,
                                 "password": new_password,
                                 "options": {
                                     "data": {
                                         "role": selected_role,
-                                        "account_subtype": "prospective" if "Prospective" in role_choice else "active"
+                                        "account_subtype": account_subtype
                                     }
                                 }
                             })
@@ -512,17 +560,20 @@ if st.session_state.get("user") is None:
     st.stop()
 
 # ---------------------------------------------------------------------------
-# STRICT ROLE-BASED NAVIGATION ROUTER WITH VIEW MODE SWITCHER
+# AUTOMATIC ROLE-BASED NAVIGATION ROUTER WITH VIEW MODE SWITCHER
 # ---------------------------------------------------------------------------
 active_user = st.session_state.get("user")
-user_role = get_user_role(active_user)
-override_mode = st.session_state.get("user_role_override")
-
-# Determine Active View Role
-active_view_role = override_mode if override_mode else user_role
+active_view_role = resolve_user_active_role(active_user)
 
 # Strictly define allowed navigation items per active view
-if active_view_role in ["tenant", "prospective_tenant"]:
+if active_view_role == "prospective_tenant":
+    PAGES = {
+        "Tenant Portal": render_tenant_portal,
+        "User Profile": page_user_profile,
+        "Settings": page_settings,
+        "Sponsor Portal": render_sponsor_portal,
+    }
+elif active_view_role in ["tenant", "active_tenant"]:
     PAGES = {
         "Tenant Portal": render_tenant_portal,
         "User Profile": page_user_profile,
@@ -548,7 +599,16 @@ if "current_page" not in st.session_state or st.session_state["current_page"] no
     st.session_state["current_page"] = "Tenant Portal" if active_view_role in ["tenant", "prospective_tenant"] else "Dashboard"
 
 with st.sidebar:
-    st.markdown(f"### Navigation ({active_view_role.replace('_', ' ').title()} View)")
+    # Role Badge Display
+    role_titles = {
+        "prospective_tenant": "🔍 Prospective Tenant",
+        "tenant": "👤 Active Tenant",
+        "landlord": "🏠 Landlord / Manager"
+    }
+    display_role = role_titles.get(active_view_role, "🏠 Landlord / Manager")
+    
+    st.markdown(f"### Portal View")
+    st.info(f"Active Mode: **{display_role}**")
     
     default_index = nav_keys.index(st.session_state["current_page"])
     selection = st.radio("Go to", nav_keys, index=default_index)
@@ -567,11 +627,12 @@ with st.sidebar:
     current_mode_idx = 0
     if active_view_role == "prospective_tenant":
         current_mode_idx = 2
-    elif active_view_role == "tenant":
+    elif active_view_role in ["tenant", "active_tenant"]:
         current_mode_idx = 1
 
     selected_mode = st.selectbox("Select View Mode", view_modes, index=current_mode_idx, key="active_view_mode_select")
 
+    override_mode = st.session_state.get("user_role_override")
     if "Prospective" in selected_mode and override_mode != "prospective_tenant":
         st.session_state["user_role_override"] = "prospective_tenant"
         st.session_state.pop("current_page", None)
@@ -580,8 +641,8 @@ with st.sidebar:
         st.session_state["user_role_override"] = "tenant"
         st.session_state.pop("current_page", None)
         st.rerun()
-    elif "Landlord" in selected_mode and override_mode is not None:
-        st.session_state.pop("user_role_override", None)
+    elif "Landlord" in selected_mode and override_mode != "landlord":
+        st.session_state["user_role_override"] = "landlord"
         st.session_state.pop("current_page", None)
         st.rerun()
 
@@ -592,7 +653,6 @@ with st.sidebar:
     
     if active_user:
         st.write(f"👤 Logged in: **{getattr(active_user, 'email', 'User')}**")
-        st.caption(f"Active View: `{active_view_role.replace('_', ' ').title()}`")
         if st.button("Logout", key="logout_btn"):
             safe_delete_cookie("rentmaster_session")
             if sb: sb.auth.sign_out()
