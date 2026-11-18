@@ -6,25 +6,52 @@ import logging
 import requests
 import streamlit as st
 from types import SimpleNamespace
+from dotenv import load_dotenv
 from services.helpers import get_secret
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("RentMaster")
 
-RAW_BACKEND_URL = (
-    get_secret("BACKEND_URL")
-    or get_secret("VITE_BACKEND_URL")
-    or "https://api.credibleartisans.com"
-)
-BACKEND_URL = RAW_BACKEND_URL.strip().rstrip("/")
-if BACKEND_URL.endswith("/auth"):
-    BACKEND_URL = BACKEND_URL[:-5]
 
+def _resolve_backend_url() -> str:
+    raw = (
+        os.environ.get("BACKEND_URL")
+        or os.environ.get("VITE_BACKEND_URL")
+        or get_secret("BACKEND_URL")
+        or get_secret("VITE_BACKEND_URL")
+        or "https://api.credibleartisans.com"
+    )
+    url = str(raw).strip().rstrip("/")
+    if url.endswith("/auth"):
+        url = url[:-5]
+    if url in ("https://credibleartisans.com", "https://www.credibleartisans.com"):
+        url = "https://api.credibleartisans.com"
+    return url
+
+
+BACKEND_URL = _resolve_backend_url()
 APP_ID = (
-    get_secret("APP_ID")
+    os.environ.get("APP_ID")
+    or os.environ.get("VITE_APP_ID")
+    or get_secret("APP_ID")
     or get_secret("VITE_APP_ID")
     or "rentmaster-gh"
 ).strip()
+
+
+def _safe_json(resp) -> dict:
+    if not resp.content:
+        return {}
+    try:
+        data = resp.json()
+        return data if isinstance(data, dict) else {"data": data}
+    except Exception:
+        snippet = resp.text[:180].strip() if resp.text else ""
+        raise Exception(
+            f"Backend returned non-JSON response (HTTP {resp.status_code}) from {resp.url}: {snippet}"
+        )
 
 
 def _ns(d):
@@ -68,7 +95,7 @@ class CustomAuthClient:
             json={"app_id": APP_ID, "email": email, "password": password},
             timeout=15,
         )
-        data = resp.json() if resp.content else {}
+        data = _safe_json(resp)
         if not resp.ok:
             raise Exception(data.get("error") or data.get("message") or f"Login failed ({resp.status_code})")
 
@@ -100,7 +127,7 @@ class CustomAuthClient:
             },
             timeout=15,
         )
-        data = resp.json() if resp.content else {}
+        data = _safe_json(resp)
         if not resp.ok:
             raise Exception(data.get("error") or data.get("message") or f"Sign up failed ({resp.status_code})")
 
@@ -126,7 +153,7 @@ class CustomAuthClient:
                 timeout=10,
             )
             if r2.ok:
-                d2 = r2.json()
+                d2 = _safe_json(r2)
                 access_token = d2.get("accessToken") or d2.get("access_token")
                 refresh_token = d2.get("refreshToken") or d2.get("refresh_token")
                 st.session_state["_rm_access_token"] = access_token
@@ -134,7 +161,7 @@ class CustomAuthClient:
                 resp = requests.get(f"{BACKEND_URL}/me", headers=self._headers(access_token), timeout=10)
 
         if resp.ok:
-            me_data = resp.json()
+            me_data = _safe_json(resp)
             payload = me_data.get("payload") or me_data.get("user") or me_data
             user_obj = self._build_user(payload)
             return _ns({"user": user_obj})
@@ -284,7 +311,7 @@ class CustomTableQuery:
                     timeout=15,
                 )
                 if resp.ok:
-                    d = resp.json()
+                    d = _safe_json(resp)
                     rec = d.get("record") or d
                     created.append(self._flatten(rec))
             return _ns({"data": created[0] if self._single and created else created})
@@ -306,7 +333,7 @@ class CustomTableQuery:
                     timeout=15,
                 )
                 if resp.ok:
-                    d = resp.json()
+                    d = _safe_json(resp)
                     rec = d.get("record") or d
                     updated.append(self._flatten(rec))
             return _ns({"data": updated})
@@ -359,7 +386,7 @@ class CustomBackendClient:
                     timeout=10,
                 )
                 if r.ok:
-                    d = r.json()
+                    d = _safe_json(r)
                     tok = d.get("accessToken") or d.get("access_token")
                     st.session_state["_rm_guest_token"] = tok
             except Exception:
@@ -378,7 +405,7 @@ class CustomBackendClient:
             )
             if not resp.ok:
                 return []
-            d = resp.json()
+            d = _safe_json(resp)
             records = d.get("records") or d.get("data") or (d if isinstance(d, list) else [])
             q = CustomTableQuery(collection, self)
             return [q._flatten(r) for r in records]
