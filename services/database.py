@@ -80,12 +80,12 @@ class CustomAuthClient:
         meta = {**claims, **(extra_meta or {})}
         if "role" not in meta:
             meta["role"] = meta.get("account_role") or raw_user.get("role") or "landlord"
-        return _ns({
-            "id": raw_user.get("id") or raw_user.get("sub") or str(uuid.uuid4()),
-            "email": raw_user.get("email", ""),
-            "role": meta["role"],
-            "user_metadata": meta,
-        })
+        return SimpleNamespace(
+            id= raw_user.get("id") or raw_user.get("sub") or str(uuid.uuid4()),
+            email=raw_user.get("email", ""),
+            role=meta["role"],
+            user_metadata=dict(meta),
+        )
 
     def sign_in_with_password(self, credentials: dict):
         email = (credentials.get("email") or "").strip().lower()
