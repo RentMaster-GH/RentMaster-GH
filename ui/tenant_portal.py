@@ -21,8 +21,14 @@ def render_tenant_portal():
     user = st.session_state.get("user")
     tenant = fetch_tenant_profile_by_email(user_email)
 
-    # DETECT IF USER IS PROSPECTIVE OR ACTIVE TENANT
-    is_prospective = not tenant or tenant.get("is_active") is False
+    # DETECT IF USER IS PROSPECTIVE OR ACTIVE TENANT (respecting sidebar View Mode Switcher)
+    override_mode = st.session_state.get("user_role_override")
+    if override_mode == "prospective_tenant":
+        is_prospective = True
+    elif override_mode == "tenant":
+        is_prospective = False
+    else:
+        is_prospective = not tenant or tenant.get("is_active") is False
 
     # -----------------------------------------------------------------------
     # VIEW A: PROSPECTIVE TENANT PORTAL (LOOKING FOR PROPERTY TO RENT)
@@ -122,7 +128,7 @@ def render_tenant_portal():
                                 st.download_button(
                                     "📄 PDF Receipt",
                                     data=pdf_bytes,
-                                    file_name=f"RentReceipt_{fmt_date(p.get('payment_date'))}_{p.get('id')[:6]}.pdf",
+                                    file_name=f"RentReceipt_{fmt_date(p.get('payment_date'))}_{str(p.get('id') or '000000')[:6]}.pdf",
                                     mime="application/pdf",
                                     key=f"tenant_rec_btn_{p['id']}"
                                 )
@@ -149,26 +155,49 @@ def render_tenant_portal():
                 m_desc = st.text_area("Detailed Description *", placeholder="Describe the maintenance issue...")
 
                 if st.form_submit_button("Submit Maintenance Request", type="primary"):
-                    if not m_title or not m_desc:
+                    if not m_title.strip() or not m_desc.strip():
                         st.error("Please fill in title and description.")
-                    elif sb:
-                        try:
-                            prop_obj = (tenant.get("properties") or {}) if tenant else {}
-                            sb.table("maintenance_requests").insert({
-                                "property_id": prop_obj.get("id"),
-                                "tenant_id": tenant.get("id") if tenant else None,
-                                "title": m_title,
-                                "description": m_desc,
-                                "priority": m_priority,
-                                "status": "open",
-                                "user_id": user_id,
-                                "user_email": user_email
-                            }).execute()
-                            clear_cache()
-                            st.success("✅ Maintenance request submitted to landlord!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Failed to submit request: {e}")
+                    else:
+                        prop_obj = (tenant.get("properties") or {}) if isinstance(tenant, dict) else {}
+                        ticket_payload = {
+                            "property_id": prop_obj.get("id"),
+                            "tenant_id": tenant.get("id") if isinstance(tenant, dict) else None,
+                            "title": m_title.strip(),
+                            "description": m_desc.strip(),
+                            "priority": m_priority,
+                            "status": "open",
+                            "user_id": user_id,
+                            "user_email": user_email,
+                            "created_at": datetime.now().isoformat(),
+                        }
+                        if sb:
+                            try:
+                                sb.table("maintenance_requests").insert(ticket_payload).execute()
+                                clear_cache()
+                            except Exception as e:
+                                st.error(f"Database warning: {e}")
+                        st.session_state.setdefault("tenant_demo_tickets", []).append(ticket_payload)
+                        st.success("✅ Maintenance request submitted to landlord!")
+                        st.rerun()
+
+            st.markdown("##### 📋 My Submitted Maintenance Tickets")
+            my_tickets = []
+            if sb and isinstance(tenant, dict) and tenant.get("id"):
+                try:
+                    t_res = sb.table("maintenance_requests").select("*").eq("tenant_id", tenant["id"]).order("created_at", desc=True).execute()
+                    my_tickets = t_res.data or []
+                except Exception:
+                    pass
+            if not my_tickets:
+                my_tickets = st.session_state.get("tenant_demo_tickets", [])
+
+            if my_tickets:
+                for tk in my_tickets:
+                    with st.container(border=True):
+                        st.write(f"**{tk.get('title')}** — Priority: `{str(tk.get('priority', 'medium')).upper()}` | Status: `{str(tk.get('status', 'open')).upper()}`")
+                        st.caption(tk.get("description", ""))
+            else:
+                st.info("No maintenance requests logged yet.")
 
         # -----------------------------------------------------------------------
         # TAB 4: CHAT & VIDEO CALL LANDLORD
