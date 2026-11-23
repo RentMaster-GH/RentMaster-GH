@@ -213,7 +213,7 @@ def resolve_user_active_role(user):
     return "landlord"
 
 
-# Persistent Cookie Auto-Login
+# Persistent Cookie Auto-Login (with automatic refresh_token rotation for 30-day sessions)
 if st.session_state.get("user") is None and sb:
     saved_session_cookie = safe_get_cookie("rentmaster_session")
     if saved_session_cookie:
@@ -221,11 +221,28 @@ if st.session_state.get("user") is None and sb:
             session_data = json.loads(saved_session_cookie) if isinstance(saved_session_cookie, str) else saved_session_cookie
             ref_token = session_data.get("refresh_token")
             acc_token = session_data.get("access_token")
-
-            if ref_token and acc_token:
-                res = sb.auth.set_session(acc_token, ref_token)
-                if res and res.user:
-                    st.session_state["user"] = res.user
+            res = None
+            if ref_token:
+                try:
+                    res = sb.auth.refresh_session(ref_token)
+                except Exception:
+                    if acc_token:
+                        res = sb.auth.set_session(acc_token, ref_token)
+            if res and getattr(res, "user", None):
+                st.session_state["user"] = res.user
+                new_sess = getattr(res, "session", None)
+                if new_sess and getattr(new_sess, "refresh_token", None):
+                    safe_set_cookie(
+                        "rentmaster_session",
+                        json.dumps({
+                            "refresh_token": new_sess.refresh_token,
+                            "access_token": new_sess.access_token,
+                            "user_email": res.user.email,
+                        }),
+                        expires_at=datetime.now() + timedelta(days=30),
+                    )
+            else:
+                safe_delete_cookie("rentmaster_session")
         except Exception:
             safe_delete_cookie("rentmaster_session")
 
@@ -242,6 +259,17 @@ if sb and "code" in st.query_params:
             st.session_state["user"] = res.user
             st.session_state.pop("user_role_override", None)
             st.session_state.pop("current_page", None)
+            oauth_sess = getattr(res, "session", None)
+            if oauth_sess and getattr(oauth_sess, "refresh_token", None):
+                safe_set_cookie(
+                    "rentmaster_session",
+                    json.dumps({
+                        "refresh_token": oauth_sess.refresh_token,
+                        "access_token": oauth_sess.access_token,
+                        "user_email": res.user.email,
+                    }),
+                    expires_at=datetime.now() + timedelta(days=30),
+                )
             clear_cache()
             st.rerun()
     except Exception:
