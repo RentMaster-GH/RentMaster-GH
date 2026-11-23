@@ -1,3 +1,4 @@
+import html
 # components/kyc.py
 import streamlit as st
 import streamlit.components.v1 as components
@@ -12,7 +13,7 @@ def render_id_verification_widget(entity_type: str = "Tenant", key_prefix: str =
     st.markdown(
         f"""
         <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-            <h6 style="margin: 0 0 0.4rem 0; color: #0369a1; font-weight: 600;">📌 {entity_type} ID Verification Guidelines</h6>
+            <h6 style="margin: 0 0 0.4rem 0; color: #0369a1; font-weight: 600;">📌 {html.escape(str(entity_type))} ID Verification Guidelines</h6>
             <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: #0c4a6e; line-height: 1.4;">
                 <li><b>Accepted IDs:</b> Ghana Card / National ID, Passport, Driver's License, Voter ID.</li>
                 <li><b>Quality Standard:</b> Clear, legible text, no blur or glare.</li>
