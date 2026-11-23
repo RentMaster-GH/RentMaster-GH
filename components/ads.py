@@ -1,4 +1,5 @@
 # components/ads.py
+import base64
 import streamlit as st
 from datetime import date, timedelta
 from services.helpers import get_current_currency, fmt_money, fmt_date
@@ -6,10 +7,38 @@ from services.database import fetch_ads, sb, clear_cache
 from services.paystack import initialize_ad_payment
 
 
+def _render_banner_image(creative_val, width=None):
+    s = str(creative_val or "").strip()
+    if not s:
+        return
+    if s.startswith("data:") and ";base64," in s:
+        _, b64 = s.split(";base64,", 1)
+        raw = base64.b64decode(b64)
+        if width:
+            st.image(raw, width=width)
+        else:
+            st.image(raw, use_container_width=True)
+    else:
+        if width:
+            st.image(s, width=width)
+        else:
+            st.image(s, use_container_width=True)
+
+
+def _is_campaign_active_today(ad: dict) -> bool:
+    today_iso = date.today().isoformat()
+    start_s = str(ad.get("start_date") or "")[:10]
+    end_s = str(ad.get("end_date") or "")[:10]
+    if start_s and start_s > today_iso:
+        return False
+    if end_s and end_s < today_iso:
+        return False
+    return True
+
+
 def render_public_ad_banners(ad_slot: str = None):
     """
-    Renders active, paid sponsor banners subtly for visitors and logged-in users.
-    Only displays banners with 'paid' or 'active' payment status.
+    Renders active, paid, non-expired sponsor banners subtly for visitors and logged-in users.
     """
     try:
         ads = fetch_ads()
@@ -17,6 +46,7 @@ def render_public_ad_banners(ad_slot: str = None):
             a for a in ads
             if isinstance(a, dict)
             and a.get("status") in ("paid", "active")
+            and _is_campaign_active_today(a)
             and (ad_slot is None or a.get("ad_slot") == ad_slot or "Login" in str(a.get("ad_slot")))
         ]
     except Exception:
@@ -46,12 +76,9 @@ def render_public_ad_banners(ad_slot: str = None):
 
     for ad in active_ads:
         with st.container(border=True):
-            if ad.get("creative_url"):
-                st.image(ad.get("creative_url"), use_container_width=True)
-            
+            _render_banner_image(ad.get("creative_url"))
             st.markdown(f"**{ad.get('business_name', 'Featured Partner')}**")
             st.caption("Official RentMaster Partner")
-            
             if ad.get("destination_url"):
                 st.link_button("🌐 Visit Sponsor Website", ad.get("destination_url"), use_container_width=True)
 
@@ -89,14 +116,13 @@ def render_ad_space_management(key_prefix: str = "ad"):
                             st.caption(f"Slot: {ad.get('ad_slot')}")
                             if ad.get("destination_url"):
                                 st.caption(f"URL: [{ad.get('destination_url')}]({ad.get('destination_url')})")
-                            if ad.get("creative_url"):
-                                st.image(ad.get("creative_url"), width=160)
+                            _render_banner_image(ad.get("creative_url"), width=160)
                         with col2:
                             st.markdown(f"Rate: **{fmt_money(ad.get('monthly_rate'))}**")
                             st.caption(f"Ref: `{ad.get('reference', 'N/A')}`")
                         with col3:
                             st.caption(f"Schedule: {fmt_date(ad.get('start_date'))} to {fmt_date(ad.get('end_date'))}")
-                            badge_color = "green" if ad.get('status') in ('paid', 'active') else "orange"
+                            badge_color = "green" if ad.get("status") in ("paid", "active") else "orange"
                             st.markdown(f"Status: :{badge_color}[**{str(ad.get('status')).upper()}**]")
                         with col4:
                             if st.button("Delete", key=f"{key_prefix}_del_ad_{ad['id']}", type="secondary"):
@@ -131,11 +157,12 @@ def render_ad_space_management(key_prefix: str = "ad"):
 
                 with f2:
                     target_url = st.text_input("Destination URL *", placeholder="https://example.com", key=f"{key_prefix}_target_url")
-                    creative_url = st.text_input("Banner Image URL *", placeholder="https://example.com/banner.png", key=f"{key_prefix}_creative_url")
+                    creative_file = st.file_uploader("Upload Banner Image (PNG / JPG / WEBP)", type=["png", "jpg", "jpeg", "webp"], key=f"{key_prefix}_creative_file")
+                    creative_url_input = st.text_input("Or Paste Banner Image URL", placeholder="https://example.com", key=f"{key_prefix}_creative_url")
                     pricing_rate = st.number_input(f"Monthly Slot Rate ({curr_code}) *", min_value=10.0, value=500.0, step=50.0, key=f"{key_prefix}_rate")
                     end_date = st.date_input("Campaign End Date", value=date.today() + timedelta(days=30), key=f"{key_prefix}_end")
 
-                callback_url = st.text_input("Callback Base URL", value="https://www.rentmastergh.com", key=f"{key_prefix}_callback")
+                callback_url = st.text_input("Callback Base URL", value="https://rentmastergh.com", key=f"{key_prefix}_callback")
 
                 campaign_days = (end_date - start_date).days
                 daily_rate = pricing_rate / 30.0
@@ -146,23 +173,31 @@ def render_ad_space_management(key_prefix: str = "ad"):
                 submit_ad = st.form_submit_button("💳 Pay Now & Launch Campaign", type="primary", use_container_width=True)
 
                 if submit_ad:
-                    if not client_name or not advertiser_email or not target_url or not creative_url:
-                        st.error("Please fill in all required fields marked with *.")
+                    final_creative = ""
+                    if creative_file is not None:
+                        raw = creative_file.getvalue()
+                        mime = getattr(creative_file, "type", None) or "image/png"
+                        final_creative = f"data:{mime};base64,{base64.b64encode(raw).decode('ascii')}"
+                    elif creative_url_input.strip():
+                        final_creative = creative_url_input.strip()
+
+                    if not client_name.strip() or not advertiser_email.strip() or not target_url.strip() or not final_creative:
+                        st.error("Please enter business name, email, destination URL, and upload or paste a banner image.")
                     elif end_date < start_date:
                         st.error("End date cannot be earlier than start date.")
                     else:
                         with st.spinner("Saving campaign & initializing checkout..."):
                             try:
                                 ps_res, ref = initialize_ad_payment(
-                                    client_name=client_name,
+                                    client_name=client_name.strip(),
                                     ad_position=ad_position,
                                     amount_ghs=total_campaign_cost,
                                     start_date=str(start_date),
                                     end_date=str(end_date),
-                                    destination_url=target_url,
-                                    creative_url=creative_url,
-                                    email=advertiser_email,
-                                    callback_url=callback_url,
+                                    destination_url=target_url.strip(),
+                                    creative_url=final_creative,
+                                    email=advertiser_email.strip(),
+                                    callback_url=callback_url.strip(),
                                     user_id=user_id
                                 )
 
