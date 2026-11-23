@@ -228,6 +228,10 @@ class CustomTableQuery:
         self._filters.append(("neq", col, val))
         return self
 
+    def ilike(self, col: str, pattern: str):
+        self._filters.append(("ilike", col, pattern))
+        return self
+
     def in_(self, col: str, vals: list):
         self._filters.append(("in", col, vals))
         return self
@@ -263,6 +267,8 @@ class CustomTableQuery:
             if op == "eq" and str(rv) != str(val):
                 return False
             if op == "neq" and str(rv) == str(val):
+                return False
+            if op == "ilike" and val.strip("%").lower() not in str(rv or "").lower():
                 return False
             if op == "in" and rv not in val:
                 return False
