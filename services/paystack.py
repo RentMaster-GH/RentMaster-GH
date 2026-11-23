@@ -169,7 +169,7 @@ def handle_paystack_callbacks():
     if reference.startswith("AD-"):
         with st.spinner("Verifying Advert Payment with Paystack..."):
             verification = verify_paystack_payment(reference)
-            if verification.get("status") and verification.get("data", {}).get("status") == "success":
+            if verification.get("status") and verification.get("data", {}).get("status") == "success" and float(verification.get("data", {}).get("amount", 0)) > 0:
                 try:
                     sb.table("ads").update({"status": "paid"}).eq("reference", reference).execute()
                     clear_cache()
@@ -185,7 +185,7 @@ def handle_paystack_callbacks():
     elif reference.startswith("PROP-"):
         with st.spinner("Verifying Property Listing Payment with Paystack..."):
             verification = verify_paystack_payment(reference)
-            if verification.get("status") and verification.get("data", {}).get("status") == "success":
+            if verification.get("status") and verification.get("data", {}).get("status") == "success" and float(verification.get("data", {}).get("amount", 0)) > 0:
                 try:
                     sb.table("public_listings").update({"status": "paid"}).eq("reference", reference).execute()
                     clear_cache()
@@ -201,7 +201,7 @@ def handle_paystack_callbacks():
     else:
         with st.spinner("Verifying Paystack Rent Payment status..."):
             verification = verify_paystack_payment(reference)
-            if verification.get("status") and verification.get("data", {}).get("status") == "success":
+            if verification.get("status") and verification.get("data", {}).get("status") == "success" and float(verification.get("data", {}).get("amount", 0)) > 0:
                 data = verification["data"]
                 meta = data.get("metadata", {})
                 try:

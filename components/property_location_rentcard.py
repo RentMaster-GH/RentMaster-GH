@@ -1,3 +1,4 @@
+import base64
 """
 RentMaster-GH - Property GPS Location Directions & Ghana Rent Card Portal
 """
@@ -161,7 +162,17 @@ def render_tenant_gps_and_rentcard_widget(tenant_user, property_id="demo_prop_1"
             if "Ghana" in details.get("country", "Ghana"):
                 if details.get("rent_card_url"):
                     st.success(f"✅ **Ghana Rent Card Issued:** `{details.get('rent_card_number', 'N/A')}`")
-                    st.link_button("📥 View / Download Official Ghana Rent Card", details["rent_card_url"], type="primary", use_container_width=True)
+                    rc_url = str(details.get("rent_card_url", ""))
+                    if rc_url.startswith("data:") and ";base64," in rc_url:
+                        header_part, b64_part = rc_url.split(";base64,", 1)
+                        mime_part = header_part.replace("data:", "")
+                        file_bytes = base64.b64decode(b64_part)
+                        fname = details.get("rent_card_filename") or f"{details.get('rent_card_number', 'Ghana_Rent_Card')}.pdf"
+                        if mime_part.startswith("image/"):
+                            st.image(file_bytes, caption=f"Official Ghana Rent Card ({details.get('rent_card_number', '')})", use_container_width=True)
+                        st.download_button("📥 Download Official Ghana Rent Card", data=file_bytes, file_name=fname, mime=mime_part, type="primary", use_container_width=True, key=f"dl_rc_{property_id}")
+                    else:
+                        st.link_button("📥 View / Download Official Ghana Rent Card", rc_url, type="primary", use_container_width=True)
                 else:
                     st.info("ℹ️ Your landlord has not published the official Ghana Rent Card for this property yet.")
             else:

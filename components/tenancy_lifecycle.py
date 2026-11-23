@@ -1,3 +1,4 @@
+from urllib.parse import quote
 """
 RentMaster-GH - Tenancy Expiration, Renewal, 14-Day Landlord Review & 3-Month Grace Period Engine
 """
@@ -211,3 +212,20 @@ def render_landlord_lease_lifecycle_widget(lease_data):
                         st.info("Marked as Pending Definite Decision.")
             else:
                 st.info(f"Decision Status: **{landlord_decision.upper()}**")
+
+
+    # 3. ONE-TAP WHATSAPP RENT & RENEWAL REMINDER
+    tenant_phone = str(lease_data.get("tenant_phone") or lease_data.get("phone") or "").strip()
+    tenant_name = str(lease_data.get("tenant_name") or "Tenant").strip()
+    rent_amt = lease_data.get("monthly_rent") or lease_data.get("rent_amount") or ""
+    clean_digits = "".join(ch for ch in tenant_phone if ch.isdigit())
+    if clean_digits.startswith("0") and len(clean_digits) == 10:
+        clean_digits = "233" + clean_digits[1:]
+    reminder_msg = (
+        f"Hello {tenant_name}, friendly reminder from RentMaster-GH regarding your tenancy "
+        f"(Lease Expiry: {end_date_str[:10]}). "
+        + (f"Rent Amount: GHS {rent_amt}. " if rent_amt else "")
+        + "Pay securely or view your Ghana Rent Card at https://rentmastergh.com"
+    )
+    wa_href = f"https://wa.me{clean_digits}?text={quote(reminder_msg)}" if clean_digits else f"https://wa.me?text={quote(reminder_msg)}"
+    st.link_button("💬 Send WhatsApp Rent / Renewal Reminder", wa_href, use_container_width=True)
