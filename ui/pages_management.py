@@ -353,7 +353,46 @@ def page_payments():
 
     with tab_manual:
         st.markdown("#### 📝 Record Offline Cash / Bank Payment")
-        st.info("Log payments collected directly via Cash or Manual Bank Deposit.")
+        st.caption("Log payments collected directly via Cash, Mobile Money Transfer, or Bank Deposit.")
+        if not tenants:
+            st.info("Add a tenant first before logging an offline payment.")
+        else:
+            t_options = {t["id"]: f"{t.get('name')} — {prop_label(t.get('properties'))}" for t in tenants}
+            with st.form("offline_payment_form", clear_on_submit=True):
+                oc1, oc2 = st.columns(2)
+                with oc1:
+                    off_tid = st.selectbox("Tenant *", options=list(t_options.keys()), format_func=lambda x: t_options[x])
+                    off_amount = st.number_input(f"Amount Received ({curr_code}) *", min_value=1.0, value=500.0, step=50.0)
+                with oc2:
+                    off_method = st.selectbox("Payment Channel *", ["cash", "bank_transfer", "mobile_money_direct", "cheque"])
+                    off_date = st.date_input("Payment Date *", value=date.today())
+                off_notes = st.text_input("Receipt / Reference Note", placeholder="e.g. Cash receipt #014 or GCB Transfer Ref")
+
+                if st.form_submit_button("💾 Save Offline Payment & Generate Receipt", type="primary", use_container_width=True):
+                    if not sb:
+                        st.error("Database connection missing.")
+                    else:
+                        try:
+                            sel_t = next((t for t in tenants if t["id"] == off_tid), {})
+                            pay_payload = {
+                                "tenant_id": off_tid,
+                                "property_id": sel_t.get("property_id"),
+                                "amount": float(off_amount),
+                                "payment_date": str(off_date),
+                                "payment_method": off_method,
+                                "status": "paid",
+                                "notes": off_notes.strip() or f"OFFLINE-{datetime.now().strftime('%Y%m%d%H%M')}",
+                            }
+                            if user_id:
+                                pay_payload["user_id"] = user_id
+                            if user_email:
+                                pay_payload["user_email"] = user_email
+                            sb.table("payments").insert(pay_payload).execute()
+                            clear_cache()
+                            st.success(f"✅ Offline payment of {fmt_money(off_amount)} recorded!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to record offline payment: {e}")
 
     with tab_expenses:
         user = st.session_state.get("user")
@@ -373,7 +412,7 @@ def page_payments():
                         if p.get("status") == "paid":
                             try:
                                 pdf_bytes = generate_receipt_pdf(t_obj or {}, p, t_obj.get("properties") if isinstance(t_obj, dict) else None)
-                                st.download_button("📄 PDF Receipt", data=pdf_bytes, file_name=f"Receipt_{p['id'][:6]}.pdf", mime="application/pdf", key=f"rec_btn_{p['id']}")
+                                st.download_button("📄 PDF Receipt", data=pdf_bytes, file_name=f"Receipt_{str(p.get('id') or '000000')[:6]}.pdf", mime="application/pdf", key=f"rec_btn_{p['id']}")
                             except Exception as e:
                                 st.caption("PDF Error")
 

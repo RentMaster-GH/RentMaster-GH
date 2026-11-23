@@ -1,7 +1,7 @@
 # ui/pages_core.py
 import json
 import streamlit as st
-from datetime import date
+from datetime import date, datetime
 from services.helpers import (
     get_active_user_info, fmt_money, fmt_date, get_current_currency, 
     SUPPORTED_CURRENCIES, get_user_role
@@ -143,7 +143,10 @@ def page_dashboard():
                 with mc3:
                     st.write(f"**Status:** `{str(m.get('status', 'open')).upper()}`")
                 with mc4:
-                    new_status = st.selectbox("Update Status", ["open", "in_progress", "resolved"], key=f"dash_maint_{m['id']}", index=0)
+                    _statuses = ["open", "in_progress", "resolved"]
+                    _cur_st = str(m.get("status") or "open").lower()
+                    _st_idx = _statuses.index(_cur_st) if _cur_st in _statuses else 0
+                    new_status = st.selectbox("Update Status", _statuses, key=f"dash_maint_{m['id']}", index=_st_idx)
                     if st.button("Update Status", key=f"dash_maint_btn_{m['id']}", type="secondary"):
                         if sb:
                             sb.table("maintenance_requests").update({"status": new_status}).eq("id", m["id"]).execute()
@@ -379,7 +382,7 @@ def page_settings():
                     with c3:
                         if st.button("✅ Approve Tenant", key=f"mgr_approve_tenant_{pt['id']}", type="primary"):
                             if sb:
-                                sb.table("tenants").update({"verification_status": "manager_approved"}).eq("id", pt["id"]).execute()
+                                sb.table("tenants").update({"verification_status": "manager_approved", "manager_approved": True, "manager_approved_at": datetime.now().isoformat()}).eq("id", pt["id"]).execute()
                                 clear_cache()
                                 st.toast("✅ Tenant Verified & Approved by Manager!", icon="🛡️")
                                 st.rerun()
