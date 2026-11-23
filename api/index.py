@@ -22,8 +22,8 @@ HTML = """<!doctype html>
     <h1>🏠 RentMaster-GH</h1>
     <p>Ghana's Unified Rental Property Management, Direct Landlord-Tenant Verification &amp; Mobile Money Escrow Platform.</p>
     <div class="btns">
-      <a class="primary" href="https://credibleartisans.com">🚀 Open Live RentMaster Portal (rent.soul)</a>
-      <a class="secondary" href="https://credibleartisans.com">🌐 Open Sovereign Ecosystem Hub</a>
+      <a class="primary" href="https://api.credibleartisans.com/public/aetherhost/live/rent.soul">🚀 Open Live RentMaster Portal (rent.soul)</a>
+      <a class="secondary" href="https://prism-app-store.vercel.app">🌐 Open Sovereign Ecosystem Hub</a>
     </div>
   </div>
 </body>
