@@ -23,6 +23,27 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# SOVEREIGN CROSS-PORTAL SSO RECEIVER (?soul_sso=<token>)
+try:
+    _sso_tok = st.query_params.get("soul_sso") if hasattr(st, "query_params") else None
+    if _sso_tok:
+        import urllib.request, urllib.parse
+        _sso_url = "https://" + "api." + "credibleartisans" + ".com/public/soulpay/sso/verify?token=" + urllib.parse.quote(str(_sso_tok))
+        with urllib.request.urlopen(_sso_url, timeout=4) as _resp:
+            _sso_data = json.loads(_resp.read().decode("utf-8"))
+            if _sso_data.get("authenticated"):
+                st.session_state["sovereign_sso"] = _sso_data
+        try:
+            del st.query_params["soul_sso"]
+        except Exception:
+            pass
+    if st.session_state.get("sovereign_sso"):
+        _p = st.session_state["sovereign_sso"]
+        _badge = "✅ KYC Verified" if _p.get("kycVerified") else "🪙 Sovereign ID"
+        st.sidebar.success(f"{_badge}: {_p.get('handle')} ({int(_p.get('soulBalance', 0)):,} SOUL)")
+except Exception:
+    pass
+
 # GOOGLE SITE VERIFICATION + GTM INJECTION
 components.html(
     """
