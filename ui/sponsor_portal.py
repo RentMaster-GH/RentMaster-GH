@@ -1,3 +1,4 @@
+import base64
 # ui/sponsor_portal.py
 import uuid
 import streamlit as st
@@ -140,9 +141,15 @@ def render_sponsor_portal():
                 else:
                     with st.spinner("Processing banner upload & initializing Paystack Checkout..."):
                         try:
-                            creative_url = banner_url_fallback
+                            creative_url = banner_url_fallback.strip()
                             if banner_file:
-                                creative_url = upload_id_to_supabase(banner_file, business_name, folder="ads")
+                                uploaded_url = upload_id_to_supabase(banner_file, business_name, folder="ads")
+                                if uploaded_url:
+                                    creative_url = uploaded_url
+                                else:
+                                    raw = banner_file.getvalue()
+                                    mime = getattr(banner_file, "type", None) or "image/png"
+                                    creative_url = f"data:{mime};base64,{base64.b64encode(raw).decode('ascii')}"
 
                             reference = f"AD-{uuid.uuid4().hex[:10].upper()}"
 
@@ -188,7 +195,8 @@ def render_sponsor_portal():
         if st.button("Search Campaign Status", type="secondary"):
             if lookup_ref and sb:
                 try:
-                    res = sb.table("ads").select("*").or_(f"reference.eq.{lookup_ref},business_name.ilike.%{lookup_ref}%").execute()
+                    safe_q = "".join(ch for ch in lookup_ref.strip() if ch.isalnum() or ch in ("-", "_", "@", ".", " "))
+                    res = sb.table("ads").select("*").or_(f"reference.eq.{safe_q},business_name.ilike.%{safe_q}%").execute()
                     ads = res.data or []
                     if ads:
                         for ad in ads:
